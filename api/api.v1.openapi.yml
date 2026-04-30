@@ -1,0 +1,43 @@
+openapi: 3.0.3
+info:
+  title: Catena Public API
+  version: 1.0.0
+  description: |
+    Public API for Catena services
+    
+    This is the API you should hit when interacting with Catena services. It is the same API that the Catena frontend uses.
+    Do not use any other API.
+  license:
+    name: MIT License
+    url: https://opensource.org/licenses/MIT
+  contact:
+    name: Catena Support
+    email: support@oncatena.com
+  termsOfService: https://oncatena.com/terms
+servers:
+  -   url: http://api.catena.localhost
+      description: Local server
+  -   url: https://api.oncatena.com
+      description: Production server
+tags:
+  - name: v1
+    description: Version 1 of the API
+paths:
+  "/v1/healthz":
+    get:
+      tags:
+        - v1
+      summary: Health Check
+      description: Check the health of the API service. Note that this will only ever return "ok".
+      operationId: healthz
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
