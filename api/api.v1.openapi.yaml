@@ -30,8 +30,6 @@ paths:
       summary: Health Check
       description: Check the health of the API service. Note that this will only ever return "ok".
       operationId: healthz
-      security:
-        - bearerAuth: []
       responses:
         "200":
           description: OK

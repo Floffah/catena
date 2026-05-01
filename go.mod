@@ -10,6 +10,8 @@ tool (
 
 require (
 	github.com/bdpiprava/scalar-go v0.13.0
+	github.com/caarlos0/env/v11 v11.4.0
+	github.com/clerk/clerk-sdk-go/v2 v2.5.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/oapi-codegen/runtime v1.4.0
@@ -27,7 +29,6 @@ require (
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
-	github.com/clerk/clerk-sdk-go/v2 v2.5.1 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/cubicdaiya/gonp v1.0.4 // indirect

@@ -1,9 +1,9 @@
 "use client";
 
-import { $api } from "@/lib/api";
+import { $api, useAuthedQuery } from "@/lib/api";
 
 export default function Page() {
-    const health = $api.useQuery("get", "/v1/healthz");
+    const health = useAuthedQuery("get", "/v1/healthz");
 
     return null;
 }
