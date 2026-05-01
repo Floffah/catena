@@ -7,7 +7,10 @@ import (
 )
 
 func main() {
-	server := api.NewServer()
+	server, err := api.NewServer()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Fatal(server.ListenAndServe())
 }

@@ -15,7 +15,7 @@ info:
     email: support@oncatena.com
   termsOfService: https://oncatena.com/terms
 servers:
-  -   url: http://api.catena.localhost
+  -   url: http://localhost:8080
       description: Local server
   -   url: https://api.oncatena.com
       description: Production server
@@ -30,6 +30,8 @@ paths:
       summary: Health Check
       description: Check the health of the API service. Note that this will only ever return "ok".
       operationId: healthz
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: OK
@@ -41,3 +43,15 @@ paths:
                   status:
                     type: string
                     example: "ok"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      in: header
+      name: Authorization
+
+security:
+  - bearerAuth: []

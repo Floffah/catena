@@ -13,6 +13,10 @@ import (
 	strictgin "github.com/oapi-codegen/runtime/strictmiddleware/gin"
 )
 
+const (
+	BearerAuthScopes = "bearerAuth.Scopes"
+)
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Health Check
@@ -31,6 +35,8 @@ type MiddlewareFunc func(c *gin.Context)
 
 // Healthz operation middleware
 func (siw *ServerInterfaceWrapper) Healthz(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)

@@ -1,0 +1,18 @@
+name: catena-dev
+
+services:
+  db:
+    profiles:
+      - db
+    image: postgres:18
+    environment:
+      POSTGRES_USER: catena
+      POSTGRES_PASSWORD: catena
+      POSTGRES_DB: catena
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql
+
+volumes:
+  db_data:

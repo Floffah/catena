@@ -1,9 +1,10 @@
 import createFetchClient from "openapi-fetch";
 import createQueryClient from "openapi-react-query";
-import {paths} from "../../types/api";
+
+import { paths } from "../../types/api";
 
 export const apiFetch = createFetchClient<paths>({
-    baseUrl: "https://api.catena.build/",
+    baseUrl: "http://localhost:8080/",
 });
 
 export const $api = createQueryClient(apiFetch);
