@@ -4,18 +4,23 @@ import prettierRecommended from "eslint-plugin-prettier/recommended";
 import { defineConfig, globalIgnores } from "eslint/config";
 
 const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  prettierRecommended,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-    "./convex/_generated/**",
-  ]),
+    ...nextVitals,
+    ...nextTs,
+    prettierRecommended,
+    // Override default ignores of eslint-config-next.
+    globalIgnores([
+        // Default ignores of eslint-config-next:
+        ".next/**",
+        "out/**",
+        "build/**",
+        "next-env.d.ts",
+        "./convex/_generated/**",
+    ]),
+    {
+        rules: {
+            "react/no-children-prop": "warn",
+        },
+    },
 ]);
 
 export default eslintConfig;

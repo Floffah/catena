@@ -24,16 +24,186 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Authenticated User
+         * @description Retrieve the authenticated Catena user, creating the local user record from Clerk if needed.
+         */
+        get: operations["getAuthenticatedUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Repository
+         * @description Create a repository owned by the authenticated user.
+         */
+        post: operations["createRepository"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{owner}/{repository}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Repository
+         * @description Retrieve a repository by owner and name. Public repositories can be retrieved without authentication.
+         */
+        get: operations["getRepositoryByOwnerAndName"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
-    responses: never;
+    schemas: {
+        CreateRepositoryRequest: {
+            /** @example catena */
+            name: string;
+            /** @example A Git hosting platform. */
+            description?: string | null;
+            visibility?: components["schemas"]["RepositoryVisibility"];
+            /**
+             * @description Defaults to `main` when omitted.
+             * @default main
+             */
+            defaultBranch?: string;
+        };
+        CreateRepositoryResponse: components["schemas"]["Repository"] & {
+            ownerName: string;
+        };
+        Error: {
+            error: string;
+        };
+        Repository: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ownerId: string;
+            name: string;
+            description?: string | null;
+            visibility: components["schemas"]["RepositoryVisibility"];
+            defaultBranch: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /**
+         * @default private
+         * @enum {string}
+         */
+        RepositoryVisibility: "private" | "public";
+        User: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            displayName?: string | null;
+            avatarUrl?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+    };
+    responses: {
+        /** @description Bad Request */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Conflict */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Internal Server Error */
+        InternalServerError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Not Found */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Unauthorized */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;
     pathItems: never;
 }
+export type SchemaCreateRepositoryRequest =
+    components["schemas"]["CreateRepositoryRequest"];
+export type SchemaCreateRepositoryResponse =
+    components["schemas"]["CreateRepositoryResponse"];
+export type SchemaError = components["schemas"]["Error"];
+export type SchemaRepository = components["schemas"]["Repository"];
+export type SchemaRepositoryVisibility =
+    components["schemas"]["RepositoryVisibility"];
+export type SchemaUser = components["schemas"]["User"];
+export type ResponseBadRequest = components["responses"]["BadRequest"];
+export type ResponseConflict = components["responses"]["Conflict"];
+export type ResponseInternalServerError =
+    components["responses"]["InternalServerError"];
+export type ResponseNotFound = components["responses"]["NotFound"];
+export type ResponseUnauthorized = components["responses"]["Unauthorized"];
 export type $defs = Record<string, never>;
 export interface operations {
     healthz: {
@@ -57,6 +227,82 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    getAuthenticatedUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createRepository: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRepositoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateRepositoryResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getRepositoryByOwnerAndName: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Repository"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
 }

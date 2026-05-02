@@ -1,7 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isProtectedRoute = createRouteMatcher(["/profile/me", "/home"]);
+const isProtectedRoute = createRouteMatcher([
+    "/profile/me",
+    "/home",
+    "/new",
+    "/new/(.*)",
+]);
 
 const isAuthRoute = createRouteMatcher(["/", "/sign-in", "/sign-up"]);
 

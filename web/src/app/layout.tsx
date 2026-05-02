@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
+import { ThemeProvider } from "next-themes";
 import { Geist, Geist_Mono } from "next/font/google";
 import { PropsWithChildren } from "react";
 
@@ -32,13 +33,20 @@ export default function RootLayout({ children }: PropsWithChildren) {
                 monoFont.variable,
                 "font-sans",
             )}
+            suppressHydrationWarning
         >
             <body className="flex min-h-full flex-col">
-                <ClerkProvider>
-                    <QueryClientProvider>
-                        <AuthProvider>{children}</AuthProvider>
-                    </QueryClientProvider>
-                </ClerkProvider>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                >
+                    <ClerkProvider>
+                        <QueryClientProvider>
+                            <AuthProvider>{children}</AuthProvider>
+                        </QueryClientProvider>
+                    </ClerkProvider>
+                </ThemeProvider>
             </body>
         </html>
     );
