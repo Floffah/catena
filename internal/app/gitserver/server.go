@@ -21,6 +21,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const basicAuthChallenge = `Basic realm="Catena Git"`
+
 type Handler struct {
 	repository db.Queries
 	git        gitstore.Store
@@ -39,6 +41,11 @@ func (h Handler) Handle(c *gin.Context) {
 	request, ok := parseRequestPath(c.Request.URL.Path)
 	if !ok {
 		c.Status(http.StatusNotFound)
+		return
+	}
+
+	if !isValidGitMethod(c.Request.Method, request.GitPath) {
+		c.Status(http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -83,8 +90,7 @@ func (h Handler) authorize(c *gin.Context, repository db.Repository, operation g
 
 	username, password, ok := c.Request.BasicAuth()
 	if !ok {
-		c.Header("WWW-Authenticate", `Basic realm="Catena Git"`)
-		c.Status(http.StatusUnauthorized)
+		writeBasicAuthChallenge(c)
 		return "", false
 	}
 
@@ -93,7 +99,7 @@ func (h Handler) authorize(c *gin.Context, repository db.Repository, operation g
 		status := http.StatusInternalServerError
 		if errors.Is(err, gitauth.ErrInvalidCredential) {
 			status = http.StatusUnauthorized
-			c.Header("WWW-Authenticate", `Basic realm="Catena Git"`)
+			c.Header("WWW-Authenticate", basicAuthChallenge)
 		}
 
 		c.Status(status)
@@ -195,6 +201,17 @@ func parseRequestPath(rawPath string) (requestPath, bool) {
 	}, true
 }
 
+func isValidGitMethod(method string, gitPath string) bool {
+	switch gitPath {
+	case "/info/refs":
+		return method == http.MethodGet
+	case "/git-upload-pack", "/git-receive-pack":
+		return method == http.MethodPost
+	default:
+		return false
+	}
+}
+
 func getOperation(gitPath string, service string) (gitOperation, bool) {
 	if gitPath == "/git-upload-pack" {
 		return gitOperationUploadPack, true
@@ -241,10 +258,15 @@ func buildCGIEnv(c *gin.Context, projectRoot string, pathInfo string, remoteUser
 		env = append(env, "HTTP_USER_AGENT="+userAgent)
 	}
 	if remoteUser != "" {
-		env = append(env, "REMOTE_USER="+remoteUser)
+		env = append(env, "AUTH_TYPE=Basic", "REMOTE_USER="+remoteUser)
 	}
 
 	return env
+}
+
+func writeBasicAuthChallenge(c *gin.Context) {
+	c.Header("WWW-Authenticate", basicAuthChallenge)
+	c.Status(http.StatusUnauthorized)
 }
 
 func writeCGIHeaders(c *gin.Context, reader *bufio.Reader) (int, error) {

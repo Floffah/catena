@@ -39,7 +39,6 @@ export default function AuthProvider({ children }: PropsWithChildren) {
 
             const newToken = await getToken();
             token = newToken;
-            console.log(newToken);
             return newToken;
         },
         enabled: isLoaded && isSignedIn,
