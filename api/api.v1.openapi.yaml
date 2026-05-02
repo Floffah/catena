@@ -60,6 +60,72 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  "/v1/git-access-tokens":
+    get:
+      tags:
+        - v1
+      summary: List Git Access Tokens
+      description: List Git access tokens for the authenticated user.
+      operationId: listGitAccessTokens
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GitAccessToken"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags:
+        - v1
+      summary: Create Git Access Token
+      description: Create a Git access token for HTTP Git authentication. The raw token is returned once.
+      operationId: createGitAccessToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGitAccessTokenRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateGitAccessTokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  "/v1/git-access-tokens/{id}":
+    delete:
+      tags:
+        - v1
+      summary: Revoke Git Access Token
+      description: Revoke a Git access token owned by the authenticated user.
+      operationId: revokeGitAccessToken
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: No Content
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/repositories":
     post:
       tags:
@@ -125,6 +191,36 @@ paths:
 
 components:
   schemas:
+    CreateGitAccessTokenRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: Local development laptop
+        scopes:
+          type: array
+          items:
+            type: string
+          example:
+            - repo:read
+            - repo:write
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateGitAccessTokenResponse:
+      type: object
+      required:
+        - token
+        - accessToken
+      properties:
+        token:
+          type: string
+          example: ctn_pat_example
+        accessToken:
+          $ref: "#/components/schemas/GitAccessToken"
     CreateRepositoryRequest:
       type: object
       required:
@@ -159,6 +255,45 @@ components:
       properties:
         error:
           type: string
+    GitAccessToken:
+      type: object
+      required:
+        - id
+        - name
+        - tokenPrefix
+        - scopes
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tokenPrefix:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     Repository:
       type: object
       required:

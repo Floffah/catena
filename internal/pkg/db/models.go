@@ -53,6 +53,20 @@ func (ns NullRepositoryVisibility) Value() (driver.Value, error) {
 	return string(ns.RepositoryVisibility), nil
 }
 
+type GitAccessToken struct {
+	ID          pgtype.UUID
+	UserID      pgtype.UUID
+	Name        string
+	TokenHash   []byte
+	TokenPrefix string
+	Scopes      []string
+	LastUsedAt  pgtype.Timestamptz
+	ExpiresAt   pgtype.Timestamptz
+	RevokedAt   pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
 type Repository struct {
 	ID            pgtype.UUID
 	OwnerID       pgtype.UUID

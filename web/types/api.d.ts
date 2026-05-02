@@ -44,6 +44,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/git-access-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Git Access Tokens
+         * @description List Git access tokens for the authenticated user.
+         */
+        get: operations["listGitAccessTokens"];
+        put?: never;
+        /**
+         * Create Git Access Token
+         * @description Create a Git access token for HTTP Git authentication. The raw token is returned once.
+         */
+        post: operations["createGitAccessToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/git-access-tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Git Access Token
+         * @description Revoke a Git access token owned by the authenticated user.
+         */
+        delete: operations["revokeGitAccessToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories": {
         parameters: {
             query?: never;
@@ -88,6 +132,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CreateGitAccessTokenRequest: {
+            /** @example Local development laptop */
+            name: string;
+            /**
+             * @example [
+             *       "repo:read",
+             *       "repo:write"
+             *     ]
+             */
+            scopes?: string[];
+            /** Format: date-time */
+            expiresAt?: string | null;
+        };
+        CreateGitAccessTokenResponse: {
+            /** @example ctn_pat_example */
+            token: string;
+            accessToken: components["schemas"]["GitAccessToken"];
+        };
         CreateRepositoryRequest: {
             /** @example catena */
             name: string;
@@ -105,6 +167,23 @@ export interface components {
         };
         Error: {
             error: string;
+        };
+        GitAccessToken: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            tokenPrefix: string;
+            scopes: string[];
+            /** Format: date-time */
+            lastUsedAt?: string | null;
+            /** Format: date-time */
+            expiresAt?: string | null;
+            /** Format: date-time */
+            revokedAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         Repository: {
             /** Format: uuid */
@@ -189,11 +268,16 @@ export interface components {
     headers: never;
     pathItems: never;
 }
+export type SchemaCreateGitAccessTokenRequest =
+    components["schemas"]["CreateGitAccessTokenRequest"];
+export type SchemaCreateGitAccessTokenResponse =
+    components["schemas"]["CreateGitAccessTokenResponse"];
 export type SchemaCreateRepositoryRequest =
     components["schemas"]["CreateRepositoryRequest"];
 export type SchemaCreateRepositoryResponse =
     components["schemas"]["CreateRepositoryResponse"];
 export type SchemaError = components["schemas"]["Error"];
+export type SchemaGitAccessToken = components["schemas"]["GitAccessToken"];
 export type SchemaRepository = components["schemas"]["Repository"];
 export type SchemaRepositoryVisibility =
     components["schemas"]["RepositoryVisibility"];
@@ -246,6 +330,77 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["User"];
                 };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listGitAccessTokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitAccessToken"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createGitAccessToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGitAccessTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateGitAccessTokenResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    revokeGitAccessToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalServerError"];

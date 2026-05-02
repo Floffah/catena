@@ -9,6 +9,7 @@ import (
 	"github.com/floffah/catena/internal/app/gitserver"
 	"github.com/floffah/catena/internal/pkg/auth"
 	"github.com/floffah/catena/internal/pkg/db"
+	"github.com/floffah/catena/internal/pkg/gitauth"
 	"github.com/floffah/catena/internal/pkg/gitstore"
 	"github.com/floffah/catena/internal/pkg/httputil"
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,7 @@ type Server struct {
 	dbConn     *pgxpool.Pool
 	auth       auth.AuthService
 	git        gitstore.Store
+	gitAuth    gitauth.Service
 }
 
 func NewServer(
@@ -30,11 +32,13 @@ func NewServer(
 	gitService gitstore.Store,
 	corsAllowedOrigins []string,
 ) (*http.Server, error) {
+	gitAuthService := gitauth.NewService(conn)
 	server := Server{
 		repository: *db.New(conn),
 		dbConn:     conn,
 		auth:       authService,
 		git:        gitService,
+		gitAuth:    gitAuthService,
 	}
 	strictServer := NewStrictHandler(&server, []StrictMiddlewareFunc{})
 
@@ -60,7 +64,7 @@ func NewServer(
 	})
 
 	RegisterHandlers(r, strictServer)
-	gitHandler := gitserver.NewHandler(conn, gitService)
+	gitHandler := gitserver.NewHandler(conn, gitService, gitAuthService)
 	r.NoRoute(gitHandler.Handle)
 
 	s := &http.Server{

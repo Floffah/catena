@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/floffah/catena/internal/pkg/db"
+	"github.com/floffah/catena/internal/pkg/gitauth"
 	"github.com/floffah/catena/internal/pkg/gitstore"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -23,12 +24,14 @@ import (
 type Handler struct {
 	repository db.Queries
 	git        gitstore.Store
+	verifier   gitauth.GitCredentialVerifier
 }
 
-func NewHandler(conn db.DBTX, gitService gitstore.Store) Handler {
+func NewHandler(conn db.DBTX, gitService gitstore.Store, verifier gitauth.GitCredentialVerifier) Handler {
 	return Handler{
 		repository: *db.New(conn),
 		git:        gitService,
+		verifier:   verifier,
 	}
 }
 
@@ -39,8 +42,9 @@ func (h Handler) Handle(c *gin.Context) {
 		return
 	}
 
-	if !isUploadPackRequest(request.GitPath, c.Request.URL.Query().Get("service")) {
-		c.String(http.StatusForbidden, "git push is not supported yet")
+	operation, ok := getOperation(request.GitPath, c.Request.URL.Query().Get("service"))
+	if !ok {
+		c.Status(http.StatusNotFound)
 		return
 	}
 
@@ -58,12 +62,12 @@ func (h Handler) Handle(c *gin.Context) {
 		return
 	}
 
-	if repository.Visibility != db.RepositoryVisibilityPublic {
-		c.Status(http.StatusUnauthorized)
+	remoteUser, ok := h.authorize(c, repository, operation)
+	if !ok {
 		return
 	}
 
-	err = h.serveGitHTTP(c, repository, request.GitPath)
+	err = h.serveGitHTTP(c, repository, request.GitPath, remoteUser)
 	if err != nil {
 		c.Error(err)
 		if !c.Writer.Written() {
@@ -72,13 +76,54 @@ func (h Handler) Handle(c *gin.Context) {
 	}
 }
 
-func (h Handler) serveGitHTTP(c *gin.Context, repository db.Repository, gitPath string) error {
+func (h Handler) authorize(c *gin.Context, repository db.Repository, operation gitOperation) (string, bool) {
+	if operation == gitOperationUploadPack && repository.Visibility == db.RepositoryVisibilityPublic {
+		return "", true
+	}
+
+	username, password, ok := c.Request.BasicAuth()
+	if !ok {
+		c.Header("WWW-Authenticate", `Basic realm="Catena Git"`)
+		c.Status(http.StatusUnauthorized)
+		return "", false
+	}
+
+	principal, err := h.verifier.VerifyGitCredential(c.Request.Context(), username, password)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, gitauth.ErrInvalidCredential) {
+			status = http.StatusUnauthorized
+			c.Header("WWW-Authenticate", `Basic realm="Catena Git"`)
+		}
+
+		c.Status(status)
+		return "", false
+	}
+
+	if principal.User.ID != repository.OwnerID {
+		c.Status(http.StatusForbidden)
+		return "", false
+	}
+
+	requiredScope := gitauth.ScopeRepoRead
+	if operation == gitOperationReceivePack {
+		requiredScope = gitauth.ScopeRepoWrite
+	}
+	if !principal.HasScope(requiredScope) {
+		c.Status(http.StatusForbidden)
+		return "", false
+	}
+
+	return principal.User.Name, true
+}
+
+func (h Handler) serveGitHTTP(c *gin.Context, repository db.Repository, gitPath string, remoteUser string) error {
 	repoPath := h.git.GetRepoPath(repository)
 	projectRoot := filepath.Dir(repoPath)
 	pathInfo := "/" + filepath.Base(repoPath) + gitPath
 
 	cmd := exec.CommandContext(c.Request.Context(), h.git.GitBinaryPath(), "http-backend")
-	cmd.Env = append(os.Environ(), buildCGIEnv(c, projectRoot, pathInfo)...)
+	cmd.Env = append(os.Environ(), buildCGIEnv(c, projectRoot, pathInfo, remoteUser)...)
 	cmd.Stdin = c.Request.Body
 
 	stdout, err := cmd.StdoutPipe()
@@ -124,6 +169,13 @@ type requestPath struct {
 	GitPath    string
 }
 
+type gitOperation string
+
+const (
+	gitOperationUploadPack  gitOperation = "git-upload-pack"
+	gitOperationReceivePack gitOperation = "git-receive-pack"
+)
+
 func parseRequestPath(rawPath string) (requestPath, bool) {
 	parts := strings.Split(strings.Trim(rawPath, "/"), "/")
 	if len(parts) < 3 {
@@ -132,7 +184,7 @@ func parseRequestPath(rawPath string) (requestPath, bool) {
 
 	repository := strings.TrimSuffix(parts[1], ".git")
 	gitPath := "/" + strings.Join(parts[2:], "/")
-	if gitPath != "/info/refs" && gitPath != "/git-upload-pack" {
+	if gitPath != "/info/refs" && gitPath != "/git-upload-pack" && gitPath != "/git-receive-pack" {
 		return requestPath{}, false
 	}
 
@@ -143,15 +195,26 @@ func parseRequestPath(rawPath string) (requestPath, bool) {
 	}, true
 }
 
-func isUploadPackRequest(gitPath string, service string) bool {
+func getOperation(gitPath string, service string) (gitOperation, bool) {
 	if gitPath == "/git-upload-pack" {
-		return true
+		return gitOperationUploadPack, true
+	}
+	if gitPath == "/git-receive-pack" {
+		return gitOperationReceivePack, true
+	}
+	if gitPath == "/info/refs" {
+		switch service {
+		case "git-upload-pack":
+			return gitOperationUploadPack, true
+		case "git-receive-pack":
+			return gitOperationReceivePack, true
+		}
 	}
 
-	return gitPath == "/info/refs" && service == "git-upload-pack"
+	return "", false
 }
 
-func buildCGIEnv(c *gin.Context, projectRoot string, pathInfo string) []string {
+func buildCGIEnv(c *gin.Context, projectRoot string, pathInfo string, remoteUser string) []string {
 	contentLength := c.Request.Header.Get("Content-Length")
 	if contentLength == "" && c.Request.ContentLength >= 0 {
 		contentLength = strconv.FormatInt(c.Request.ContentLength, 10)
@@ -176,6 +239,9 @@ func buildCGIEnv(c *gin.Context, projectRoot string, pathInfo string) []string {
 
 	if userAgent := c.Request.Header.Get("User-Agent"); userAgent != "" {
 		env = append(env, "HTTP_USER_AGENT="+userAgent)
+	}
+	if remoteUser != "" {
+		env = append(env, "REMOTE_USER="+remoteUser)
 	}
 
 	return env

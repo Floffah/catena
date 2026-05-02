@@ -38,6 +38,19 @@ func (e RepositoryVisibility) Valid() bool {
 	}
 }
 
+// CreateGitAccessTokenRequest defines model for CreateGitAccessTokenRequest.
+type CreateGitAccessTokenRequest struct {
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	Name      string     `json:"name"`
+	Scopes    *[]string  `json:"scopes,omitempty"`
+}
+
+// CreateGitAccessTokenResponse defines model for CreateGitAccessTokenResponse.
+type CreateGitAccessTokenResponse struct {
+	AccessToken GitAccessToken `json:"accessToken"`
+	Token       string         `json:"token"`
+}
+
 // CreateRepositoryRequest defines model for CreateRepositoryRequest.
 type CreateRepositoryRequest struct {
 	// DefaultBranch Defaults to `main` when omitted.
@@ -63,6 +76,19 @@ type CreateRepositoryResponse struct {
 // Error defines model for Error.
 type Error struct {
 	Error string `json:"error"`
+}
+
+// GitAccessToken defines model for GitAccessToken.
+type GitAccessToken struct {
+	CreatedAt   time.Time          `json:"createdAt"`
+	ExpiresAt   *time.Time         `json:"expiresAt,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	LastUsedAt  *time.Time         `json:"lastUsedAt,omitempty"`
+	Name        string             `json:"name"`
+	RevokedAt   *time.Time         `json:"revokedAt,omitempty"`
+	Scopes      []string           `json:"scopes"`
+	TokenPrefix string             `json:"tokenPrefix"`
+	UpdatedAt   time.Time          `json:"updatedAt"`
 }
 
 // Repository defines model for Repository.
@@ -105,11 +131,23 @@ type NotFound = Error
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
+// CreateGitAccessTokenJSONRequestBody defines body for CreateGitAccessToken for application/json ContentType.
+type CreateGitAccessTokenJSONRequestBody = CreateGitAccessTokenRequest
+
 // CreateRepositoryJSONRequestBody defines body for CreateRepository for application/json ContentType.
 type CreateRepositoryJSONRequestBody = CreateRepositoryRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List Git Access Tokens
+	// (GET /v1/git-access-tokens)
+	ListGitAccessTokens(c *gin.Context)
+	// Create Git Access Token
+	// (POST /v1/git-access-tokens)
+	CreateGitAccessToken(c *gin.Context)
+	// Revoke Git Access Token
+	// (DELETE /v1/git-access-tokens/{id})
+	RevokeGitAccessToken(c *gin.Context, id openapi_types.UUID)
 	// Health Check
 	// (GET /v1/healthz)
 	Healthz(c *gin.Context)
@@ -132,6 +170,62 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
+
+// ListGitAccessTokens operation middleware
+func (siw *ServerInterfaceWrapper) ListGitAccessTokens(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListGitAccessTokens(c)
+}
+
+// CreateGitAccessToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateGitAccessToken(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CreateGitAccessToken(c)
+}
+
+// RevokeGitAccessToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokeGitAccessToken(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.RevokeGitAccessToken(c, id)
+}
 
 // Healthz operation middleware
 func (siw *ServerInterfaceWrapper) Healthz(c *gin.Context) {
@@ -238,6 +332,9 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
+	router.GET(options.BaseURL+"/v1/git-access-tokens", wrapper.ListGitAccessTokens)
+	router.POST(options.BaseURL+"/v1/git-access-tokens", wrapper.CreateGitAccessToken)
+	router.DELETE(options.BaseURL+"/v1/git-access-tokens/:id", wrapper.RevokeGitAccessToken)
 	router.GET(options.BaseURL+"/v1/healthz", wrapper.Healthz)
 	router.POST(options.BaseURL+"/v1/repositories", wrapper.CreateRepository)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository", wrapper.GetRepositoryByOwnerAndName)
@@ -253,6 +350,124 @@ type InternalServerErrorJSONResponse Error
 type NotFoundJSONResponse Error
 
 type UnauthorizedJSONResponse Error
+
+type ListGitAccessTokensRequestObject struct {
+}
+
+type ListGitAccessTokensResponseObject interface {
+	VisitListGitAccessTokensResponse(w http.ResponseWriter) error
+}
+
+type ListGitAccessTokens200JSONResponse []GitAccessToken
+
+func (response ListGitAccessTokens200JSONResponse) VisitListGitAccessTokensResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListGitAccessTokens401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListGitAccessTokens401JSONResponse) VisitListGitAccessTokensResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListGitAccessTokens500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response ListGitAccessTokens500JSONResponse) VisitListGitAccessTokensResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateGitAccessTokenRequestObject struct {
+	Body *CreateGitAccessTokenJSONRequestBody
+}
+
+type CreateGitAccessTokenResponseObject interface {
+	VisitCreateGitAccessTokenResponse(w http.ResponseWriter) error
+}
+
+type CreateGitAccessToken201JSONResponse CreateGitAccessTokenResponse
+
+func (response CreateGitAccessToken201JSONResponse) VisitCreateGitAccessTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateGitAccessToken400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateGitAccessToken400JSONResponse) VisitCreateGitAccessTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateGitAccessToken401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateGitAccessToken401JSONResponse) VisitCreateGitAccessTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateGitAccessToken500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response CreateGitAccessToken500JSONResponse) VisitCreateGitAccessTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RevokeGitAccessTokenRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type RevokeGitAccessTokenResponseObject interface {
+	VisitRevokeGitAccessTokenResponse(w http.ResponseWriter) error
+}
+
+type RevokeGitAccessToken204Response struct {
+}
+
+func (response RevokeGitAccessToken204Response) VisitRevokeGitAccessTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeGitAccessToken401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RevokeGitAccessToken401JSONResponse) VisitRevokeGitAccessTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RevokeGitAccessToken500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response RevokeGitAccessToken500JSONResponse) VisitRevokeGitAccessTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
 
 type HealthzRequestObject struct {
 }
@@ -412,6 +627,15 @@ func (response GetAuthenticatedUser500JSONResponse) VisitGetAuthenticatedUserRes
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// List Git Access Tokens
+	// (GET /v1/git-access-tokens)
+	ListGitAccessTokens(ctx context.Context, request ListGitAccessTokensRequestObject) (ListGitAccessTokensResponseObject, error)
+	// Create Git Access Token
+	// (POST /v1/git-access-tokens)
+	CreateGitAccessToken(ctx context.Context, request CreateGitAccessTokenRequestObject) (CreateGitAccessTokenResponseObject, error)
+	// Revoke Git Access Token
+	// (DELETE /v1/git-access-tokens/{id})
+	RevokeGitAccessToken(ctx context.Context, request RevokeGitAccessTokenRequestObject) (RevokeGitAccessTokenResponseObject, error)
 	// Health Check
 	// (GET /v1/healthz)
 	Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error)
@@ -436,6 +660,91 @@ func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareF
 type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
+}
+
+// ListGitAccessTokens operation middleware
+func (sh *strictHandler) ListGitAccessTokens(ctx *gin.Context) {
+	var request ListGitAccessTokensRequestObject
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGitAccessTokens(ctx, request.(ListGitAccessTokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGitAccessTokens")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(ListGitAccessTokensResponseObject); ok {
+		if err := validResponse.VisitListGitAccessTokensResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateGitAccessToken operation middleware
+func (sh *strictHandler) CreateGitAccessToken(ctx *gin.Context) {
+	var request CreateGitAccessTokenRequestObject
+
+	var body CreateGitAccessTokenJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
+		ctx.Error(err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateGitAccessToken(ctx, request.(CreateGitAccessTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateGitAccessToken")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(CreateGitAccessTokenResponseObject); ok {
+		if err := validResponse.VisitCreateGitAccessTokenResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeGitAccessToken operation middleware
+func (sh *strictHandler) RevokeGitAccessToken(ctx *gin.Context, id openapi_types.UUID) {
+	var request RevokeGitAccessTokenRequestObject
+
+	request.Id = id
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeGitAccessToken(ctx, request.(RevokeGitAccessTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeGitAccessToken")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(RevokeGitAccessTokenResponseObject); ok {
+		if err := validResponse.VisitRevokeGitAccessTokenResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Healthz operation middleware

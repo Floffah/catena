@@ -1,8 +1,11 @@
 package api
 
 import (
+	"time"
+
 	"github.com/floffah/catena/internal/pkg/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func RepositoryToAPI(repository db.Repository) (Repository, error) {
@@ -42,4 +45,35 @@ func UserToAPI(user db.User) (User, error) {
 		Name:        user.Name,
 		UpdatedAt:   user.UpdatedAt.Time,
 	}, nil
+}
+
+func GitAccessTokenToAPI(token db.GitAccessToken) (GitAccessToken, error) {
+	id, err := uuid.FromBytes(token.ID.Bytes[:])
+	if err != nil {
+		return GitAccessToken{}, err
+	}
+
+	return GitAccessToken{
+		CreatedAt:   token.CreatedAt.Time,
+		ExpiresAt:   timestampPtr(token.ExpiresAt),
+		Id:          id,
+		LastUsedAt:  timestampPtr(token.LastUsedAt),
+		Name:        token.Name,
+		RevokedAt:   timestampPtr(token.RevokedAt),
+		Scopes:      token.Scopes,
+		TokenPrefix: token.TokenPrefix,
+		UpdatedAt:   token.UpdatedAt.Time,
+	}, nil
+}
+
+func UUIDToPgtype(id uuid.UUID) pgtype.UUID {
+	return pgtype.UUID{Bytes: id, Valid: true}
+}
+
+func timestampPtr(ts pgtype.Timestamptz) *time.Time {
+	if !ts.Valid {
+		return nil
+	}
+
+	return &ts.Time
 }
