@@ -15,10 +15,10 @@ info:
     email: support@oncatena.com
   termsOfService: https://oncatena.com/terms
 servers:
-  -   url: http://localhost:8080
-      description: Local server
-  -   url: https://api.oncatena.com
-      description: Production server
+  - url: http://localhost:8080
+    description: Local server
+  - url: https://api.oncatena.com
+    description: Production server
 tags:
   - name: v1
     description: Version 1 of the API
@@ -30,6 +30,7 @@ paths:
       summary: Health Check
       description: Check the health of the API service. Note that this will only ever return "ok".
       operationId: healthz
+      security: [ ]
       responses:
         "200":
           description: OK
@@ -41,8 +42,218 @@ paths:
                   status:
                     type: string
                     example: "ok"
+  "/v1/user":
+    get:
+      tags:
+        - v1
+      summary: Get Authenticated User
+      description: Retrieve the authenticated Catena user, creating the local user record from Clerk if needed.
+      operationId: getAuthenticatedUser
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories":
+    post:
+      tags:
+        - v1
+      summary: Create Repository
+      description: Create a repository owned by the authenticated user.
+      operationId: createRepository
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRepositoryRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateRepositoryResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}":
+    get:
+      tags:
+        - v1
+      summary: Get Repository
+      description: Retrieve a repository by owner and name. Public repositories can be retrieved without authentication.
+      operationId: getRepositoryByOwnerAndName
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Repository"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
 components:
+  schemas:
+    CreateRepositoryRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: catena
+        description:
+          type: string
+          nullable: true
+          example: A Git hosting platform.
+        visibility:
+          $ref: "#/components/schemas/RepositoryVisibility"
+        defaultBranch:
+          type: string
+          description: Defaults to `main` when omitted.
+          default: "main"
+    CreateRepositoryResponse:
+      allOf:
+        - $ref: "#/components/schemas/Repository"
+        - type: object
+          required:
+            - ownerName
+          properties:
+            ownerName:
+              type: string
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+    Repository:
+      type: object
+      required:
+        - id
+        - ownerId
+        - ownerName
+        - name
+        - visibility
+        - defaultBranch
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        visibility:
+          $ref: "#/components/schemas/RepositoryVisibility"
+        defaultBranch:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RepositoryVisibility:
+      type: string
+      enum:
+        - private
+        - public
+      default: private
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   securitySchemes:
     bearerAuth:
       type: http
@@ -52,4 +263,4 @@ components:
       name: Authorization
 
 security:
-  - bearerAuth: []
+  - bearerAuth: [ ]

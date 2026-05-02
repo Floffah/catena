@@ -8,20 +8,120 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/runtime"
 	strictgin "github.com/oapi-codegen/runtime/strictmiddleware/gin"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
 	BearerAuthScopes = "bearerAuth.Scopes"
 )
 
+// Defines values for RepositoryVisibility.
+const (
+	Private RepositoryVisibility = "private"
+	Public  RepositoryVisibility = "public"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryVisibility enum.
+func (e RepositoryVisibility) Valid() bool {
+	switch e {
+	case Private:
+		return true
+	case Public:
+		return true
+	default:
+		return false
+	}
+}
+
+// CreateRepositoryRequest defines model for CreateRepositoryRequest.
+type CreateRepositoryRequest struct {
+	// DefaultBranch Defaults to `main` when omitted.
+	DefaultBranch *string               `json:"defaultBranch,omitempty"`
+	Description   *string               `json:"description,omitempty"`
+	Name          string                `json:"name"`
+	Visibility    *RepositoryVisibility `json:"visibility,omitempty"`
+}
+
+// CreateRepositoryResponse defines model for CreateRepositoryResponse.
+type CreateRepositoryResponse struct {
+	CreatedAt     time.Time            `json:"createdAt"`
+	DefaultBranch string               `json:"defaultBranch"`
+	Description   *string              `json:"description,omitempty"`
+	Id            openapi_types.UUID   `json:"id"`
+	Name          string               `json:"name"`
+	OwnerId       openapi_types.UUID   `json:"ownerId"`
+	OwnerName     string               `json:"ownerName"`
+	UpdatedAt     time.Time            `json:"updatedAt"`
+	Visibility    RepositoryVisibility `json:"visibility"`
+}
+
+// Error defines model for Error.
+type Error struct {
+	Error string `json:"error"`
+}
+
+// Repository defines model for Repository.
+type Repository struct {
+	CreatedAt     time.Time            `json:"createdAt"`
+	DefaultBranch string               `json:"defaultBranch"`
+	Description   *string              `json:"description,omitempty"`
+	Id            openapi_types.UUID   `json:"id"`
+	Name          string               `json:"name"`
+	OwnerId       openapi_types.UUID   `json:"ownerId"`
+	UpdatedAt     time.Time            `json:"updatedAt"`
+	Visibility    RepositoryVisibility `json:"visibility"`
+}
+
+// RepositoryVisibility defines model for RepositoryVisibility.
+type RepositoryVisibility string
+
+// User defines model for User.
+type User struct {
+	AvatarUrl   *string            `json:"avatarUrl,omitempty"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	DisplayName *string            `json:"displayName,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+	UpdatedAt   time.Time          `json:"updatedAt"`
+}
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Error
+
+// Conflict defines model for Conflict.
+type Conflict = Error
+
+// InternalServerError defines model for InternalServerError.
+type InternalServerError = Error
+
+// NotFound defines model for NotFound.
+type NotFound = Error
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Error
+
+// CreateRepositoryJSONRequestBody defines body for CreateRepository for application/json ContentType.
+type CreateRepositoryJSONRequestBody = CreateRepositoryRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Health Check
 	// (GET /v1/healthz)
 	Healthz(c *gin.Context)
+	// Create Repository
+	// (POST /v1/repositories)
+	CreateRepository(c *gin.Context)
+	// Get Repository
+	// (GET /v1/repositories/{owner}/{repository})
+	GetRepositoryByOwnerAndName(c *gin.Context, owner string, repository string)
+	// Get Authenticated User
+	// (GET /v1/user)
+	GetAuthenticatedUser(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -36,6 +136,19 @@ type MiddlewareFunc func(c *gin.Context)
 // Healthz operation middleware
 func (siw *ServerInterfaceWrapper) Healthz(c *gin.Context) {
 
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.Healthz(c)
+}
+
+// CreateRepository operation middleware
+func (siw *ServerInterfaceWrapper) CreateRepository(c *gin.Context) {
+
 	c.Set(BearerAuthScopes, []string{})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -45,7 +158,57 @@ func (siw *ServerInterfaceWrapper) Healthz(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.Healthz(c)
+	siw.Handler.CreateRepository(c)
+}
+
+// GetRepositoryByOwnerAndName operation middleware
+func (siw *ServerInterfaceWrapper) GetRepositoryByOwnerAndName(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", c.Param("owner"), &owner, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter owner: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "repository" -------------
+	var repository string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repository", c.Param("repository"), &repository, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter repository: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetRepositoryByOwnerAndName(c, owner, repository)
+}
+
+// GetAuthenticatedUser operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthenticatedUser(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetAuthenticatedUser(c)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -76,7 +239,20 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	}
 
 	router.GET(options.BaseURL+"/v1/healthz", wrapper.Healthz)
+	router.POST(options.BaseURL+"/v1/repositories", wrapper.CreateRepository)
+	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository", wrapper.GetRepositoryByOwnerAndName)
+	router.GET(options.BaseURL+"/v1/user", wrapper.GetAuthenticatedUser)
 }
+
+type BadRequestJSONResponse Error
+
+type ConflictJSONResponse Error
+
+type InternalServerErrorJSONResponse Error
+
+type NotFoundJSONResponse Error
+
+type UnauthorizedJSONResponse Error
 
 type HealthzRequestObject struct {
 }
@@ -96,11 +272,158 @@ func (response Healthz200JSONResponse) VisitHealthzResponse(w http.ResponseWrite
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateRepositoryRequestObject struct {
+	Body *CreateRepositoryJSONRequestBody
+}
+
+type CreateRepositoryResponseObject interface {
+	VisitCreateRepositoryResponse(w http.ResponseWriter) error
+}
+
+type CreateRepository201JSONResponse CreateRepositoryResponse
+
+func (response CreateRepository201JSONResponse) VisitCreateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRepository400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateRepository400JSONResponse) VisitCreateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRepository401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateRepository401JSONResponse) VisitCreateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRepository409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateRepository409JSONResponse) VisitCreateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRepository500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response CreateRepository500JSONResponse) VisitCreateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryByOwnerAndNameRequestObject struct {
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+}
+
+type GetRepositoryByOwnerAndNameResponseObject interface {
+	VisitGetRepositoryByOwnerAndNameResponse(w http.ResponseWriter) error
+}
+
+type GetRepositoryByOwnerAndName200JSONResponse Repository
+
+func (response GetRepositoryByOwnerAndName200JSONResponse) VisitGetRepositoryByOwnerAndNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryByOwnerAndName401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetRepositoryByOwnerAndName401JSONResponse) VisitGetRepositoryByOwnerAndNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryByOwnerAndName404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetRepositoryByOwnerAndName404JSONResponse) VisitGetRepositoryByOwnerAndNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryByOwnerAndName500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetRepositoryByOwnerAndName500JSONResponse) VisitGetRepositoryByOwnerAndNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAuthenticatedUserRequestObject struct {
+}
+
+type GetAuthenticatedUserResponseObject interface {
+	VisitGetAuthenticatedUserResponse(w http.ResponseWriter) error
+}
+
+type GetAuthenticatedUser200JSONResponse User
+
+func (response GetAuthenticatedUser200JSONResponse) VisitGetAuthenticatedUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAuthenticatedUser401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetAuthenticatedUser401JSONResponse) VisitGetAuthenticatedUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAuthenticatedUser500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetAuthenticatedUser500JSONResponse) VisitGetAuthenticatedUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Health Check
 	// (GET /v1/healthz)
 	Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error)
+	// Create Repository
+	// (POST /v1/repositories)
+	CreateRepository(ctx context.Context, request CreateRepositoryRequestObject) (CreateRepositoryResponseObject, error)
+	// Get Repository
+	// (GET /v1/repositories/{owner}/{repository})
+	GetRepositoryByOwnerAndName(ctx context.Context, request GetRepositoryByOwnerAndNameRequestObject) (GetRepositoryByOwnerAndNameResponseObject, error)
+	// Get Authenticated User
+	// (GET /v1/user)
+	GetAuthenticatedUser(ctx context.Context, request GetAuthenticatedUserRequestObject) (GetAuthenticatedUserResponseObject, error)
 }
 
 type StrictHandlerFunc = strictgin.StrictGinHandlerFunc
@@ -133,6 +456,92 @@ func (sh *strictHandler) Healthz(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(HealthzResponseObject); ok {
 		if err := validResponse.VisitHealthzResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRepository operation middleware
+func (sh *strictHandler) CreateRepository(ctx *gin.Context) {
+	var request CreateRepositoryRequestObject
+
+	var body CreateRepositoryJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
+		ctx.Error(err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRepository(ctx, request.(CreateRepositoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRepository")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(CreateRepositoryResponseObject); ok {
+		if err := validResponse.VisitCreateRepositoryResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRepositoryByOwnerAndName operation middleware
+func (sh *strictHandler) GetRepositoryByOwnerAndName(ctx *gin.Context, owner string, repository string) {
+	var request GetRepositoryByOwnerAndNameRequestObject
+
+	request.Owner = owner
+	request.Repository = repository
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRepositoryByOwnerAndName(ctx, request.(GetRepositoryByOwnerAndNameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRepositoryByOwnerAndName")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(GetRepositoryByOwnerAndNameResponseObject); ok {
+		if err := validResponse.VisitGetRepositoryByOwnerAndNameResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthenticatedUser operation middleware
+func (sh *strictHandler) GetAuthenticatedUser(ctx *gin.Context) {
+	var request GetAuthenticatedUserRequestObject
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthenticatedUser(ctx, request.(GetAuthenticatedUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthenticatedUser")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(GetAuthenticatedUserResponseObject); ok {
+		if err := validResponse.VisitGetAuthenticatedUserResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {

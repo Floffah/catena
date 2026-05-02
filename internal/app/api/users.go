@@ -1,0 +1,27 @@
+package api
+
+import "context"
+
+func (s *Server) GetAuthenticatedUser(ctx context.Context, request GetAuthenticatedUserRequestObject) (GetAuthenticatedUserResponseObject, error) {
+	_, user, err := s.auth.EnsureUserInContext(ctx)
+	if err != nil {
+		return GetAuthenticatedUser500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
+		}, nil
+	}
+
+	if user.ID.Valid == false {
+		return GetAuthenticatedUser401JSONResponse{
+			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
+		}, nil
+	}
+
+	response, err := UserToAPI(user)
+	if err != nil {
+		return GetAuthenticatedUser500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to encode user"},
+		}, nil
+	}
+
+	return GetAuthenticatedUser200JSONResponse(response), nil
+}

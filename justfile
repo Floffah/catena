@@ -31,13 +31,21 @@ check: lint test
 dev: dev-api dev-web dev-db
 
 dev-api:
-	go run cmd/api/api.go
+	go tool wgo run cmd/api/api.go
 
 dev-web:
 	cd web && bun run dev
 
 dev-db:
 	docker compose -f deployments/dev.docker-compose.yml up -d db
+
+[confirm]
+dev-reset-gitstore:
+	rm -rf ${CATENA_GIT_ROOT}
+
+dev-reset:
+	@just db-reset
+	@just dev-reset-gitstore
 
 # -- db --
 
@@ -46,3 +54,11 @@ db-new-migration NAME:
 
 db-migrate:
     TERN_MIGRATIONS=./data/migrations/ go tool tern migrate
+
+db-rollback:
+	TERN_MIGRATIONS=./data/migrations/ go tool tern migrate -d -1
+
+[confirm]
+db-reset:
+    TERN_MIGRATIONS=./data/migrations/ go tool tern migrate -d 0
+    @just db-migrate

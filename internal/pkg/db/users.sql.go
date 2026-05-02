@@ -7,10 +7,105 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createUser = `-- name: CreateUser :one
+insert into users (
+  clerk_user_id,
+  name,
+  display_name,
+  avatar_url
+) values (
+  $1,
+  $2,
+  $3,
+  $4
+)
+returning id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at
+`
+
+type CreateUserParams struct {
+	ClerkUserID string
+	Name        string
+	DisplayName *string
+	AvatarUrl   *string
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUser,
+		arg.ClerkUserID,
+		arg.Name,
+		arg.DisplayName,
+		arg.AvatarUrl,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.ClerkUserID,
+		&i.Name,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteUser = `-- name: DeleteUser :exec
+delete from users
+where id = $1
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUser, id)
+	return err
+}
+
+const getUserByClerkUserID = `-- name: GetUserByClerkUserID :one
+select id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at from users
+where clerk_user_id = $1
+`
+
+func (q *Queries) GetUserByClerkUserID(ctx context.Context, clerkUserID string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByClerkUserID, clerkUserID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.ClerkUserID,
+		&i.Name,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByID = `-- name: GetUserByID :one
+select id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at from users
+where id = $1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.ClerkUserID,
+		&i.Name,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserByName = `-- name: GetUserByName :one
-select id, name, created_at, updated_at from users where name = $1
+select id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at from users
+where name = $1
 `
 
 func (q *Queries) GetUserByName(ctx context.Context, name string) (User, error) {
@@ -18,7 +113,47 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (User, error) 
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.ClerkUserID,
 		&i.Name,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserProfile = `-- name: UpdateUserProfile :one
+update users
+set
+  name = $2,
+  display_name = $3,
+  avatar_url = $4
+where id = $1
+returning id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at
+`
+
+type UpdateUserProfileParams struct {
+	ID          pgtype.UUID
+	Name        string
+	DisplayName *string
+	AvatarUrl   *string
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserProfile,
+		arg.ID,
+		arg.Name,
+		arg.DisplayName,
+		arg.AvatarUrl,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.ClerkUserID,
+		&i.Name,
+		&i.DisplayName,
+		&i.AvatarUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

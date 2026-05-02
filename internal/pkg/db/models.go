@@ -5,12 +5,71 @@
 package db
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type RepositoryVisibility string
+
+const (
+	RepositoryVisibilityPrivate RepositoryVisibility = "private"
+	RepositoryVisibilityPublic  RepositoryVisibility = "public"
+)
+
+func (e *RepositoryVisibility) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RepositoryVisibility(s)
+	case string:
+		*e = RepositoryVisibility(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RepositoryVisibility: %T", src)
+	}
+	return nil
+}
+
+type NullRepositoryVisibility struct {
+	RepositoryVisibility RepositoryVisibility
+	Valid                bool // Valid is true if RepositoryVisibility is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRepositoryVisibility) Scan(value interface{}) error {
+	if value == nil {
+		ns.RepositoryVisibility, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RepositoryVisibility.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRepositoryVisibility) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RepositoryVisibility), nil
+}
+
+type Repository struct {
+	ID            pgtype.UUID
+	OwnerID       pgtype.UUID
+	Name          string
+	Description   *string
+	Visibility    RepositoryVisibility
+	DefaultBranch string
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
 type User struct {
-	ID        int32
-	Name      string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID          pgtype.UUID
+	ClerkUserID string
+	Name        string
+	DisplayName *string
+	AvatarUrl   *string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
 }
