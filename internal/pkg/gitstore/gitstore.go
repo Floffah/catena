@@ -1,6 +1,9 @@
 package gitstore
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/floffah/catena/internal/pkg/db"
 	"github.com/floffah/catena/internal/pkg/environment"
 	"github.com/floffah/catena/internal/pkg/git"
@@ -27,7 +30,12 @@ func NewStoreFromEnv(env environment.Environment) Store {
 func (s Store) CreateRepo(dbRepo db.Repository) error {
 	repoPath := s.GetRepoPath(dbRepo)
 
-	err := s.git.Init(repoPath)
+	err := os.MkdirAll(filepath.Dir(repoPath), 0755)
+	if err != nil {
+		return err
+	}
+
+	err = s.git.InitBare(repoPath, dbRepo.DefaultBranch)
 	if err != nil {
 		return err
 	}
@@ -39,5 +47,9 @@ func (s Store) GetRepoPath(dbRepo db.Repository) string {
 	byte1 := dbRepo.ID.String()[:2]
 	byte2 := dbRepo.ID.String()[2:4]
 
-	return s.root + "/" + string(byte1) + "/" + string(byte2) + "/" + dbRepo.ID.String() + ".git"
+	return filepath.Join(s.root, string(byte1), string(byte2), dbRepo.ID.String()+".git")
+}
+
+func (s Store) GitBinaryPath() string {
+	return s.git.Path()
 }

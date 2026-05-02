@@ -6,6 +6,7 @@ import (
 
 	scalargo "github.com/bdpiprava/scalar-go"
 	"github.com/floffah/catena/api"
+	"github.com/floffah/catena/internal/app/gitserver"
 	"github.com/floffah/catena/internal/pkg/auth"
 	"github.com/floffah/catena/internal/pkg/db"
 	"github.com/floffah/catena/internal/pkg/gitstore"
@@ -59,6 +60,8 @@ func NewServer(
 	})
 
 	RegisterHandlers(r, strictServer)
+	gitHandler := gitserver.NewHandler(conn, gitService)
+	r.NoRoute(gitHandler.Handle)
 
 	s := &http.Server{
 		Handler: r,
