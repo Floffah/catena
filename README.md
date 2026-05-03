@@ -1,6 +1,6 @@
 # Catena
 
-Open source modern git server. My attempt at replacing GitHub. Catena is experimental for now. The goal is to build a fast, modern, self-hostable social Git platform with a great developer experience and a clean web UI.
+Open source modern git server. My attempt at making a GitHub-like system. Catena is experimental for now. The goal is to build a fast, modern, self-hostable social Git platform with a great developer experience and a clean web UI.
 
 ## Roadmap
 
