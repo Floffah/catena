@@ -1,6 +1,35 @@
 package git
 
-import "os/exec"
+import (
+	"context"
+	"fmt"
+	"os/exec"
+	"path"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type TreeEntry struct {
+	Mode string
+	Type string
+	OID  string
+	Size *int64
+	Path string
+}
+
+type CommitSummary struct {
+	OID             string
+	ShortOID        string
+	MessageHeadline string
+	Message         string
+	AuthorName      string
+	AuthorEmail     string
+	AuthoredAt      time.Time
+	CommitterName   string
+	CommitterEmail  string
+	CommittedAt     time.Time
+}
 
 // Git client, currently just a backend for gitstore and git binary, but eventually will incorporate go-git
 type Git struct {
@@ -33,4 +62,164 @@ func (g Git) InitBare(repoPath string, defaultBranch string) error {
 
 func (g Git) Path() string {
 	return g.BinaryPath
+}
+
+func (g Git) ResolveCommit(ctx context.Context, repoPath string, ref string) (string, error) {
+	cmd := exec.CommandContext(ctx, g.BinaryPath, "-C", repoPath, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+func (g Git) LsTreePath(ctx context.Context, repoPath string, commitOID string, filePath string) (*TreeEntry, error) {
+	cmd := exec.CommandContext(ctx, g.BinaryPath, "-C", repoPath, "ls-tree", "-l", commitOID, "--", filePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(string(output)) == "" {
+		return nil, nil
+	}
+
+	metadata, _, found := strings.Cut(string(output), "\t")
+	if !found {
+		return nil, fmt.Errorf("failed to parse ls-tree output")
+	}
+
+	fields := strings.Fields(metadata)
+	if len(fields) != 4 {
+		return nil, fmt.Errorf("failed to parse ls-tree metadata")
+	}
+
+	size, err := parseLsTreeSize(fields[3])
+	if err != nil {
+		return nil, err
+	}
+
+	return &TreeEntry{
+		Mode: fields[0],
+		Type: fields[1],
+		OID:  fields[2],
+		Size: size,
+		Path: strings.TrimRight(strings.TrimPrefix(string(output), metadata+"\t"), "\n"),
+	}, nil
+}
+
+func (g Git) LsTree(ctx context.Context, repoPath string, treeish string) ([]TreeEntry, error) {
+	cmd := exec.CommandContext(ctx, g.BinaryPath, "-C", repoPath, "ls-tree", "-l", "-z", treeish)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	records := strings.Split(strings.TrimRight(string(output), "\x00"), "\x00")
+	entries := make([]TreeEntry, 0, len(records))
+	for _, record := range records {
+		if record == "" {
+			continue
+		}
+
+		entry, err := parseLsTreeRecord(record)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
+func (g Git) CatFileBlob(ctx context.Context, repoPath string, oid string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, g.BinaryPath, "-C", repoPath, "cat-file", "blob", oid)
+	return cmd.Output()
+}
+
+func (g Git) LogLatest(ctx context.Context, repoPath string, ref string, filePath string) (*CommitSummary, error) {
+	format := "%H%x00%h%x00%s%x00%B%x00%an%x00%ae%x00%aI%x00%cn%x00%ce%x00%cI"
+	args := []string{"-C", repoPath, "log", "-1", "--format=" + format, ref, "--"}
+	if filePath != "" {
+		args = append(args, filePath)
+	}
+
+	cmd := exec.CommandContext(ctx, g.BinaryPath, args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(string(output)) == "" {
+		return nil, nil
+	}
+
+	return parseCommitSummary(string(output))
+}
+
+func parseLsTreeRecord(record string) (TreeEntry, error) {
+	metadata, entryPath, found := strings.Cut(record, "\t")
+	if !found {
+		return TreeEntry{}, fmt.Errorf("failed to parse ls-tree output")
+	}
+
+	fields := strings.Fields(metadata)
+	if len(fields) != 4 {
+		return TreeEntry{}, fmt.Errorf("failed to parse ls-tree metadata")
+	}
+
+	size, err := parseLsTreeSize(fields[3])
+	if err != nil {
+		return TreeEntry{}, err
+	}
+
+	return TreeEntry{
+		Mode: fields[0],
+		Type: fields[1],
+		OID:  fields[2],
+		Size: size,
+		Path: path.Clean(entryPath),
+	}, nil
+}
+
+func parseLsTreeSize(raw string) (*int64, error) {
+	if raw == "-" {
+		return nil, nil
+	}
+
+	size, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &size, nil
+}
+
+func parseCommitSummary(output string) (*CommitSummary, error) {
+	fields := strings.Split(strings.TrimRight(output, "\n"), "\x00")
+	if len(fields) != 10 {
+		return nil, fmt.Errorf("failed to parse git log output")
+	}
+
+	authoredAt, err := time.Parse(time.RFC3339, fields[6])
+	if err != nil {
+		return nil, err
+	}
+
+	committedAt, err := time.Parse(time.RFC3339, fields[9])
+	if err != nil {
+		return nil, err
+	}
+
+	return &CommitSummary{
+		OID:             fields[0],
+		ShortOID:        fields[1],
+		MessageHeadline: fields[2],
+		Message:         strings.TrimRight(fields[3], "\n"),
+		AuthorName:      fields[4],
+		AuthorEmail:     fields[5],
+		AuthoredAt:      authoredAt,
+		CommitterName:   fields[7],
+		CommitterEmail:  fields[8],
+		CommittedAt:     committedAt,
+	}, nil
 }

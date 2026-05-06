@@ -9,6 +9,7 @@ import (
 	"github.com/floffah/catena/internal/pkg/db"
 	"github.com/floffah/catena/internal/pkg/environment"
 	"github.com/floffah/catena/internal/pkg/gitstore"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -16,6 +17,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	ginMode := "debug"
+	if env.Config.Mode == "production" {
+		ginMode = "release"
+	}
+	gin.SetMode(ginMode)
 
 	conn, err := db.Connect(context.Background(), env.Config.DatabaseURL)
 	if err != nil {

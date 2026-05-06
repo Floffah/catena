@@ -2,22 +2,9 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
-import { Middleware } from "openapi-fetch";
 import { PropsWithChildren, createContext, useContext, useEffect } from "react";
 
-import { apiFetch } from "@/lib/api";
-
-let token: string | null = null;
-
-const authMiddleware: Middleware = {
-    async onRequest({ request }) {
-        if (token) {
-            request.headers.set("Authorization", `Bearer ${token}`);
-        }
-
-        return request;
-    },
-};
+import { setAuthToken } from "@/lib/api";
 
 interface AuthContextValue {
     isLoading: boolean;
@@ -31,14 +18,19 @@ export default function AuthProvider({ children }: PropsWithChildren) {
 
     const getTokenQuery = useQuery({
         queryKey: ["AuthProvider", "getToken", sessionId],
-        queryFn: async () => {
+        queryFn: async ({ client }) => {
             if (!isLoaded || !isSignedIn) {
-                token = null;
+                setAuthToken(null);
                 return null;
             }
 
             const newToken = await getToken();
-            token = newToken;
+            setAuthToken(newToken);
+
+            client.refetchQueries({
+                predicate: (query) => !!query.meta?.refetchOnAuth,
+            });
+
             return newToken;
         },
         enabled: isLoaded && isSignedIn,
@@ -49,17 +41,9 @@ export default function AuthProvider({ children }: PropsWithChildren) {
 
     useEffect(() => {
         if (isLoaded && !isSignedIn) {
-            token = null;
+            setAuthToken(null);
         }
     }, [isLoaded, isSignedIn]);
-
-    useEffect(() => {
-        apiFetch.use(authMiddleware);
-
-        return () => {
-            apiFetch.eject(authMiddleware);
-        };
-    }, []);
 
     return (
         <AuthContext.Provider value={{ isLoading, isAuthenticated }}>

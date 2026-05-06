@@ -9,6 +9,7 @@ import (
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/clerk/clerk-sdk-go/v2/jwks"
 	"github.com/clerk/clerk-sdk-go/v2/jwt"
+	"github.com/clerk/clerk-sdk-go/v2/signintoken"
 	"github.com/clerk/clerk-sdk-go/v2/user"
 	"github.com/floffah/catena/internal/pkg/db"
 	"github.com/gin-gonic/gin"
@@ -17,10 +18,16 @@ import (
 
 const UserContextKey = "user"
 
+var (
+	ClerkPublishableKey string
+	ClerkFrontendApiUrl string
+)
+
 type AuthService struct {
-	repository db.Queries
-	ClerkJwks  *jwks.Client
-	ClerkUser  *user.Client
+	repository       db.Queries
+	ClerkJwks        *jwks.Client
+	ClerkUser        *user.Client
+	ClerkSignInToken *signintoken.Client
 }
 
 func NewAuthService(clerkSecretKey string, conn db.DBTX) AuthService {
@@ -28,11 +35,13 @@ func NewAuthService(clerkSecretKey string, conn db.DBTX) AuthService {
 	clerkConf.Key = &clerkSecretKey
 	clerkJwks := jwks.NewClient(clerkConf)
 	clerkUser := user.NewClient(clerkConf)
+	clerkSIT := signintoken.NewClient(clerkConf)
 
 	return AuthService{
-		repository: *db.New(conn),
-		ClerkJwks:  clerkJwks,
-		ClerkUser:  clerkUser,
+		repository:       *db.New(conn),
+		ClerkJwks:        clerkJwks,
+		ClerkUser:        clerkUser,
+		ClerkSignInToken: clerkSIT,
 	}
 }
 
@@ -142,4 +151,17 @@ func (s *AuthService) Middleware() gin.HandlerFunc {
 		c.Set(UserContextKey, authuser)
 		c.Next()
 	}
+}
+
+func (s *AuthService) CreateClerkSignInToken(user db.User) (string, error) {
+	expiresInSeconds := int64(20)
+	signInToken, err := s.ClerkSignInToken.Create(context.Background(), &signintoken.CreateParams{
+		UserID:           &user.ClerkUserID,
+		ExpiresInSeconds: &expiresInSeconds,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return signInToken.Token, nil
 }

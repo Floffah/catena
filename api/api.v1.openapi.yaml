@@ -60,6 +60,24 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  "/v1/auth/clerk/sign-in-token":
+    post:
+      tags:
+        - v1
+      summary: Create Clerk Sign-In Token
+      description: Create a Clerk sign-in token for the authenticated user. This is intended for CLI login handoff flows.
+      operationId: createClerkSignInToken
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateClerkSignInTokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/git-access-tokens":
     get:
       tags:
@@ -188,9 +206,160 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}/readme":
+    get:
+      tags:
+        - v1
+      summary: Get Repository README
+      description: Retrieve the first supported README file in a repository directory. Public repositories can be retrieved without authentication.
+      operationId: getRepositoryReadme
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: query
+          required: false
+          description: Branch, tag, or commit to read from. Defaults to the repository default branch.
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: false
+          description: Directory path to search for a README in. Defaults to the repository root.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryReadme"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}/latest-commit":
+    get:
+      tags:
+        - v1
+      summary: Get Repository Latest Commit
+      description: Retrieve the most recent commit for a repository ref and optional path. Public repositories can be retrieved without authentication.
+      operationId: getRepositoryLatestCommit
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: query
+          required: false
+          description: Branch, tag, or commit to read from. Defaults to the repository default branch.
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: false
+          description: Repository path to constrain the latest commit lookup. Defaults to the repository root.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryLatestCommit"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}/tree":
+    get:
+      tags:
+        - v1
+      summary: Get Repository Tree
+      description: Retrieve the files and directories at a repository path. Public repositories can be retrieved without authentication.
+      operationId: getRepositoryTree
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: query
+          required: false
+          description: Branch, tag, or commit to read from. Defaults to the repository default branch.
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: false
+          description: Directory path to list. Defaults to the repository root.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryTree"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
 components:
   schemas:
+    CreateClerkSignInTokenResponse:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
     CreateGitAccessTokenRequest:
       type: object
       required:
@@ -312,6 +481,8 @@ components:
         ownerId:
           type: string
           format: uuid
+        ownerName:
+          type: string
         name:
           type: string
         description:
@@ -333,6 +504,117 @@ components:
         - private
         - public
       default: private
+    RepositoryReadme:
+      type: object
+      required:
+        - ref
+        - commitOid
+        - path
+        - name
+        - oid
+        - size
+        - encoding
+        - content
+      properties:
+        ref:
+          type: string
+        commitOid:
+          type: string
+        path:
+          type: string
+        name:
+          type: string
+        oid:
+          type: string
+        size:
+          type: integer
+          format: int64
+        encoding:
+          type: string
+          example: utf-8
+        content:
+          type: string
+    RepositoryLatestCommit:
+      type: object
+      required:
+        - ref
+        - commitOid
+        - shortOid
+        - messageHeadline
+        - message
+        - authorName
+        - authorEmail
+        - authoredAt
+        - committerName
+        - committerEmail
+        - committedAt
+      properties:
+        ref:
+          type: string
+        commitOid:
+          type: string
+        shortOid:
+          type: string
+        messageHeadline:
+          type: string
+        message:
+          type: string
+        authorName:
+          type: string
+        authorEmail:
+          type: string
+        authoredAt:
+          type: string
+          format: date-time
+        committerName:
+          type: string
+        committerEmail:
+          type: string
+        committedAt:
+          type: string
+          format: date-time
+    RepositoryTree:
+      type: object
+      required:
+        - ref
+        - commitOid
+        - path
+        - entries
+      properties:
+        ref:
+          type: string
+        commitOid:
+          type: string
+        path:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryTreeEntry"
+    RepositoryTreeEntry:
+      type: object
+      required:
+        - name
+        - path
+        - type
+        - oid
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        type:
+          type: string
+          enum:
+            - blob
+            - tree
+            - commit
+        oid:
+          type: string
+        size:
+          type: integer
+          format: int64
+          nullable: true
     User:
       type: object
       required:

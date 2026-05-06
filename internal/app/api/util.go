@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func RepositoryToAPI(repository db.Repository) (Repository, error) {
+func RepositoryToAPI(repository db.Repository, ownerName string) (Repository, error) {
 	id, err := uuid.FromBytes(repository.ID.Bytes[:])
 	if err != nil {
 		return Repository{}, err
@@ -26,6 +26,7 @@ func RepositoryToAPI(repository db.Repository) (Repository, error) {
 		Id:            id,
 		Name:          repository.Name,
 		OwnerId:       ownerID,
+		OwnerName:     ownerName,
 		UpdatedAt:     repository.UpdatedAt.Time,
 		Visibility:    RepositoryVisibility(repository.Visibility),
 	}, nil

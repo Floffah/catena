@@ -10,9 +10,11 @@ tool (
 )
 
 require (
+	github.com/alecthomas/kong v1.15.0
 	github.com/bdpiprava/scalar-go v0.13.0
 	github.com/caarlos0/env/v11 v11.4.0
 	github.com/clerk/clerk-sdk-go/v2 v2.5.1
+	github.com/cli/browser v1.3.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2

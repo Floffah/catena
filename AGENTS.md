@@ -41,4 +41,15 @@ read `justfile` or run `just` to see available commands. do not run dev commands
 - Keep generated files generated; edit OpenAPI specs, SQL queries, or migrations instead.
 - Prefer explicit SQL and small service boundaries.
 - Do not implement Git internals until the platform can create, clone, push, and view repos using the Git binary.
+- Keep `internal/pkg/git` as a thin Git-binary wrapper; put Catena Git business logic in `internal/pkg/gitstore`.
 - If an architectural decision is unclear or risky, stop and ask before building around it.
+
+## Skills
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# Next.js: ALWAYS read docs before coding
+
+Before any Next.js work, find and read the relevant doc in `node_modules/next/dist/docs/`. Your training data is outdated — the docs are the source of truth.
+
+<!-- END:nextjs-agent-rules -->

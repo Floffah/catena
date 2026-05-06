@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/clerk/sign-in-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Clerk Sign-In Token
+         * @description Create a Clerk sign-in token for the authenticated user. This is intended for CLI login handoff flows.
+         */
+        post: operations["createClerkSignInToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/git-access-tokens": {
         parameters: {
             query?: never;
@@ -128,10 +148,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{owner}/{repository}/readme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Repository README
+         * @description Retrieve the first supported README file in a repository directory. Public repositories can be retrieved without authentication.
+         */
+        get: operations["getRepositoryReadme"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{owner}/{repository}/latest-commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Repository Latest Commit
+         * @description Retrieve the most recent commit for a repository ref and optional path. Public repositories can be retrieved without authentication.
+         */
+        get: operations["getRepositoryLatestCommit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{owner}/{repository}/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Repository Tree
+         * @description Retrieve the files and directories at a repository path. Public repositories can be retrieved without authentication.
+         */
+        get: operations["getRepositoryTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CreateClerkSignInTokenResponse: {
+            token: string;
+        };
         CreateGitAccessTokenRequest: {
             /** @example Local development laptop */
             name: string;
@@ -190,6 +273,7 @@ export interface components {
             id: string;
             /** Format: uuid */
             ownerId: string;
+            ownerName: string;
             name: string;
             description?: string | null;
             visibility: components["schemas"]["RepositoryVisibility"];
@@ -204,6 +288,48 @@ export interface components {
          * @enum {string}
          */
         RepositoryVisibility: "private" | "public";
+        RepositoryReadme: {
+            ref: string;
+            commitOid: string;
+            path: string;
+            name: string;
+            oid: string;
+            /** Format: int64 */
+            size: number;
+            /** @example utf-8 */
+            encoding: string;
+            content: string;
+        };
+        RepositoryLatestCommit: {
+            ref: string;
+            commitOid: string;
+            shortOid: string;
+            messageHeadline: string;
+            message: string;
+            authorName: string;
+            authorEmail: string;
+            /** Format: date-time */
+            authoredAt: string;
+            committerName: string;
+            committerEmail: string;
+            /** Format: date-time */
+            committedAt: string;
+        };
+        RepositoryTree: {
+            ref: string;
+            commitOid: string;
+            path: string;
+            entries: components["schemas"]["RepositoryTreeEntry"][];
+        };
+        RepositoryTreeEntry: {
+            name: string;
+            path: string;
+            /** @enum {string} */
+            type: "blob" | "tree" | "commit";
+            oid: string;
+            /** Format: int64 */
+            size?: number | null;
+        };
         User: {
             /** Format: uuid */
             id: string;
@@ -268,6 +394,8 @@ export interface components {
     headers: never;
     pathItems: never;
 }
+export type SchemaCreateClerkSignInTokenResponse =
+    components["schemas"]["CreateClerkSignInTokenResponse"];
 export type SchemaCreateGitAccessTokenRequest =
     components["schemas"]["CreateGitAccessTokenRequest"];
 export type SchemaCreateGitAccessTokenResponse =
@@ -281,6 +409,12 @@ export type SchemaGitAccessToken = components["schemas"]["GitAccessToken"];
 export type SchemaRepository = components["schemas"]["Repository"];
 export type SchemaRepositoryVisibility =
     components["schemas"]["RepositoryVisibility"];
+export type SchemaRepositoryReadme = components["schemas"]["RepositoryReadme"];
+export type SchemaRepositoryLatestCommit =
+    components["schemas"]["RepositoryLatestCommit"];
+export type SchemaRepositoryTree = components["schemas"]["RepositoryTree"];
+export type SchemaRepositoryTreeEntry =
+    components["schemas"]["RepositoryTreeEntry"];
 export type SchemaUser = components["schemas"]["User"];
 export type ResponseBadRequest = components["responses"]["BadRequest"];
 export type ResponseConflict = components["responses"]["Conflict"];
@@ -329,6 +463,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["User"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createClerkSignInToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateClerkSignInTokenResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -455,6 +611,102 @@ export interface operations {
                     "application/json": components["schemas"]["Repository"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getRepositoryReadme: {
+        parameters: {
+            query?: {
+                /** @description Branch, tag, or commit to read from. Defaults to the repository default branch. */
+                ref?: string;
+                /** @description Directory path to search for a README in. Defaults to the repository root. */
+                path?: string;
+            };
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryReadme"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getRepositoryLatestCommit: {
+        parameters: {
+            query?: {
+                /** @description Branch, tag, or commit to read from. Defaults to the repository default branch. */
+                ref?: string;
+                /** @description Repository path to constrain the latest commit lookup. Defaults to the repository root. */
+                path?: string;
+            };
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryLatestCommit"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getRepositoryTree: {
+        parameters: {
+            query?: {
+                /** @description Branch, tag, or commit to read from. Defaults to the repository default branch. */
+                ref?: string;
+                /** @description Directory path to list. Defaults to the repository root. */
+                path?: string;
+            };
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryTree"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];

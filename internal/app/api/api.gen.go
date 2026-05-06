@@ -4,10 +4,14 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +23,27 @@ import (
 const (
 	BearerAuthScopes = "bearerAuth.Scopes"
 )
+
+// Defines values for RepositoryTreeEntryType.
+const (
+	Blob   RepositoryTreeEntryType = "blob"
+	Commit RepositoryTreeEntryType = "commit"
+	Tree   RepositoryTreeEntryType = "tree"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryTreeEntryType enum.
+func (e RepositoryTreeEntryType) Valid() bool {
+	switch e {
+	case Blob:
+		return true
+	case Commit:
+		return true
+	case Tree:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for RepositoryVisibility.
 const (
@@ -36,6 +61,11 @@ func (e RepositoryVisibility) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// CreateClerkSignInTokenResponse defines model for CreateClerkSignInTokenResponse.
+type CreateClerkSignInTokenResponse struct {
+	Token string `json:"token"`
 }
 
 // CreateGitAccessTokenRequest defines model for CreateGitAccessTokenRequest.
@@ -99,9 +129,57 @@ type Repository struct {
 	Id            openapi_types.UUID   `json:"id"`
 	Name          string               `json:"name"`
 	OwnerId       openapi_types.UUID   `json:"ownerId"`
+	OwnerName     string               `json:"ownerName"`
 	UpdatedAt     time.Time            `json:"updatedAt"`
 	Visibility    RepositoryVisibility `json:"visibility"`
 }
+
+// RepositoryLatestCommit defines model for RepositoryLatestCommit.
+type RepositoryLatestCommit struct {
+	AuthorEmail     string    `json:"authorEmail"`
+	AuthorName      string    `json:"authorName"`
+	AuthoredAt      time.Time `json:"authoredAt"`
+	CommitOid       string    `json:"commitOid"`
+	CommittedAt     time.Time `json:"committedAt"`
+	CommitterEmail  string    `json:"committerEmail"`
+	CommitterName   string    `json:"committerName"`
+	Message         string    `json:"message"`
+	MessageHeadline string    `json:"messageHeadline"`
+	Ref             string    `json:"ref"`
+	ShortOid        string    `json:"shortOid"`
+}
+
+// RepositoryReadme defines model for RepositoryReadme.
+type RepositoryReadme struct {
+	CommitOid string `json:"commitOid"`
+	Content   string `json:"content"`
+	Encoding  string `json:"encoding"`
+	Name      string `json:"name"`
+	Oid       string `json:"oid"`
+	Path      string `json:"path"`
+	Ref       string `json:"ref"`
+	Size      int64  `json:"size"`
+}
+
+// RepositoryTree defines model for RepositoryTree.
+type RepositoryTree struct {
+	CommitOid string                `json:"commitOid"`
+	Entries   []RepositoryTreeEntry `json:"entries"`
+	Path      string                `json:"path"`
+	Ref       string                `json:"ref"`
+}
+
+// RepositoryTreeEntry defines model for RepositoryTreeEntry.
+type RepositoryTreeEntry struct {
+	Name string                  `json:"name"`
+	Oid  string                  `json:"oid"`
+	Path string                  `json:"path"`
+	Size *int64                  `json:"size,omitempty"`
+	Type RepositoryTreeEntryType `json:"type"`
+}
+
+// RepositoryTreeEntryType defines model for RepositoryTreeEntry.Type.
+type RepositoryTreeEntryType string
 
 // RepositoryVisibility defines model for RepositoryVisibility.
 type RepositoryVisibility string
@@ -131,14 +209,1771 @@ type NotFound = Error
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
+// GetRepositoryLatestCommitParams defines parameters for GetRepositoryLatestCommit.
+type GetRepositoryLatestCommitParams struct {
+	// Ref Branch, tag, or commit to read from. Defaults to the repository default branch.
+	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Path Repository path to constrain the latest commit lookup. Defaults to the repository root.
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// GetRepositoryReadmeParams defines parameters for GetRepositoryReadme.
+type GetRepositoryReadmeParams struct {
+	// Ref Branch, tag, or commit to read from. Defaults to the repository default branch.
+	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Path Directory path to search for a README in. Defaults to the repository root.
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// GetRepositoryTreeParams defines parameters for GetRepositoryTree.
+type GetRepositoryTreeParams struct {
+	// Ref Branch, tag, or commit to read from. Defaults to the repository default branch.
+	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Path Directory path to list. Defaults to the repository root.
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
 // CreateGitAccessTokenJSONRequestBody defines body for CreateGitAccessToken for application/json ContentType.
 type CreateGitAccessTokenJSONRequestBody = CreateGitAccessTokenRequest
 
 // CreateRepositoryJSONRequestBody defines body for CreateRepository for application/json ContentType.
 type CreateRepositoryJSONRequestBody = CreateRepositoryRequest
 
+// RequestEditorFn  is the function signature for the RequestEditor callback function
+type RequestEditorFn func(ctx context.Context, req *http.Request) error
+
+// Doer performs HTTP requests.
+//
+// The standard http.Client implements this interface.
+type HttpRequestDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// Client which conforms to the OpenAPI3 specification for this service.
+type Client struct {
+	// The endpoint of the server conforming to this interface, with scheme,
+	// https://api.deepmap.com for example. This can contain a path relative
+	// to the server, such as https://api.deepmap.com/dev-test, and all the
+	// paths in the swagger spec will be appended to the server.
+	Server string
+
+	// Doer for performing requests, typically a *http.Client with any
+	// customized settings, such as certificate chains.
+	Client HttpRequestDoer
+
+	// A list of callbacks for modifying requests which are generated before sending over
+	// the network.
+	RequestEditors []RequestEditorFn
+}
+
+// ClientOption allows setting custom parameters during construction
+type ClientOption func(*Client) error
+
+// Creates a new Client, with reasonable defaults
+func NewClient(server string, opts ...ClientOption) (*Client, error) {
+	// create a client with sane default values
+	client := Client{
+		Server: server,
+	}
+	// mutate client and add all optional params
+	for _, o := range opts {
+		if err := o(&client); err != nil {
+			return nil, err
+		}
+	}
+	// ensure the server URL always has a trailing slash
+	if !strings.HasSuffix(client.Server, "/") {
+		client.Server += "/"
+	}
+	// create httpClient, if not already present
+	if client.Client == nil {
+		client.Client = &http.Client{}
+	}
+	return &client, nil
+}
+
+// WithHTTPClient allows overriding the default Doer, which is
+// automatically created using http.Client. This is useful for tests.
+func WithHTTPClient(doer HttpRequestDoer) ClientOption {
+	return func(c *Client) error {
+		c.Client = doer
+		return nil
+	}
+}
+
+// WithRequestEditorFn allows setting up a callback function, which will be
+// called right before sending the request. This can be used to mutate the request.
+func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
+	return func(c *Client) error {
+		c.RequestEditors = append(c.RequestEditors, fn)
+		return nil
+	}
+}
+
+// The interface specification for the client above.
+type ClientInterface interface {
+	// CreateClerkSignInToken request
+	CreateClerkSignInToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListGitAccessTokens request
+	ListGitAccessTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGitAccessTokenWithBody request with any body
+	CreateGitAccessTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateGitAccessToken(ctx context.Context, body CreateGitAccessTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeGitAccessToken request
+	RevokeGitAccessToken(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Healthz request
+	Healthz(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateRepositoryWithBody request with any body
+	CreateRepositoryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateRepository(ctx context.Context, body CreateRepositoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRepositoryByOwnerAndName request
+	GetRepositoryByOwnerAndName(ctx context.Context, owner string, repository string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRepositoryLatestCommit request
+	GetRepositoryLatestCommit(ctx context.Context, owner string, repository string, params *GetRepositoryLatestCommitParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRepositoryReadme request
+	GetRepositoryReadme(ctx context.Context, owner string, repository string, params *GetRepositoryReadmeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRepositoryTree request
+	GetRepositoryTree(ctx context.Context, owner string, repository string, params *GetRepositoryTreeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuthenticatedUser request
+	GetAuthenticatedUser(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) CreateClerkSignInToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateClerkSignInTokenRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListGitAccessTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListGitAccessTokensRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateGitAccessTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGitAccessTokenRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateGitAccessToken(ctx context.Context, body CreateGitAccessTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGitAccessTokenRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RevokeGitAccessToken(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeGitAccessTokenRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) Healthz(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewHealthzRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateRepositoryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateRepositoryRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateRepository(ctx context.Context, body CreateRepositoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateRepositoryRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetRepositoryByOwnerAndName(ctx context.Context, owner string, repository string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRepositoryByOwnerAndNameRequest(c.Server, owner, repository)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetRepositoryLatestCommit(ctx context.Context, owner string, repository string, params *GetRepositoryLatestCommitParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRepositoryLatestCommitRequest(c.Server, owner, repository, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetRepositoryReadme(ctx context.Context, owner string, repository string, params *GetRepositoryReadmeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRepositoryReadmeRequest(c.Server, owner, repository, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetRepositoryTree(ctx context.Context, owner string, repository string, params *GetRepositoryTreeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRepositoryTreeRequest(c.Server, owner, repository, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAuthenticatedUser(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthenticatedUserRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewCreateClerkSignInTokenRequest generates requests for CreateClerkSignInToken
+func NewCreateClerkSignInTokenRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/clerk/sign-in-token")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListGitAccessTokensRequest generates requests for ListGitAccessTokens
+func NewListGitAccessTokensRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/git-access-tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateGitAccessTokenRequest calls the generic CreateGitAccessToken builder with application/json body
+func NewCreateGitAccessTokenRequest(server string, body CreateGitAccessTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateGitAccessTokenRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateGitAccessTokenRequestWithBody generates requests for CreateGitAccessToken with any type of body
+func NewCreateGitAccessTokenRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/git-access-tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeGitAccessTokenRequest generates requests for RevokeGitAccessToken
+func NewRevokeGitAccessTokenRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/git-access-tokens/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewHealthzRequest generates requests for Healthz
+func NewHealthzRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/healthz")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateRepositoryRequest calls the generic CreateRepository builder with application/json body
+func NewCreateRepositoryRequest(server string, body CreateRepositoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateRepositoryRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateRepositoryRequestWithBody generates requests for CreateRepository with any type of body
+func NewCreateRepositoryRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/repositories")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetRepositoryByOwnerAndNameRequest generates requests for GetRepositoryByOwnerAndName
+func NewGetRepositoryByOwnerAndNameRequest(server string, owner string, repository string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "owner", owner, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "repository", repository, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/repositories/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetRepositoryLatestCommitRequest generates requests for GetRepositoryLatestCommit
+func NewGetRepositoryLatestCommitRequest(server string, owner string, repository string, params *GetRepositoryLatestCommitParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "owner", owner, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "repository", repository, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/repositories/%s/%s/latest-commit", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Ref != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ref", *params.Ref, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetRepositoryReadmeRequest generates requests for GetRepositoryReadme
+func NewGetRepositoryReadmeRequest(server string, owner string, repository string, params *GetRepositoryReadmeParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "owner", owner, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "repository", repository, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/repositories/%s/%s/readme", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Ref != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ref", *params.Ref, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetRepositoryTreeRequest generates requests for GetRepositoryTree
+func NewGetRepositoryTreeRequest(server string, owner string, repository string, params *GetRepositoryTreeParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "owner", owner, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "repository", repository, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/repositories/%s/%s/tree", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Ref != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ref", *params.Ref, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuthenticatedUserRequest generates requests for GetAuthenticatedUser
+func NewGetAuthenticatedUserRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/user")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
+	for _, r := range c.RequestEditors {
+		if err := r(ctx, req); err != nil {
+			return err
+		}
+	}
+	for _, r := range additionalEditors {
+		if err := r(ctx, req); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ClientWithResponses builds on ClientInterface to offer response payloads
+type ClientWithResponses struct {
+	ClientInterface
+}
+
+// NewClientWithResponses creates a new ClientWithResponses, which wraps
+// Client with return type handling
+func NewClientWithResponses(server string, opts ...ClientOption) (*ClientWithResponses, error) {
+	client, err := NewClient(server, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &ClientWithResponses{client}, nil
+}
+
+// WithBaseURL overrides the baseURL.
+func WithBaseURL(baseURL string) ClientOption {
+	return func(c *Client) error {
+		newBaseURL, err := url.Parse(baseURL)
+		if err != nil {
+			return err
+		}
+		c.Server = newBaseURL.String()
+		return nil
+	}
+}
+
+// ClientWithResponsesInterface is the interface specification for the client with responses above.
+type ClientWithResponsesInterface interface {
+	// CreateClerkSignInTokenWithResponse request
+	CreateClerkSignInTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CreateClerkSignInTokenClientResponse, error)
+
+	// ListGitAccessTokensWithResponse request
+	ListGitAccessTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListGitAccessTokensClientResponse, error)
+
+	// CreateGitAccessTokenWithBodyWithResponse request with any body
+	CreateGitAccessTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGitAccessTokenClientResponse, error)
+
+	CreateGitAccessTokenWithResponse(ctx context.Context, body CreateGitAccessTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGitAccessTokenClientResponse, error)
+
+	// RevokeGitAccessTokenWithResponse request
+	RevokeGitAccessTokenWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*RevokeGitAccessTokenClientResponse, error)
+
+	// HealthzWithResponse request
+	HealthzWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthzClientResponse, error)
+
+	// CreateRepositoryWithBodyWithResponse request with any body
+	CreateRepositoryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRepositoryClientResponse, error)
+
+	CreateRepositoryWithResponse(ctx context.Context, body CreateRepositoryJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateRepositoryClientResponse, error)
+
+	// GetRepositoryByOwnerAndNameWithResponse request
+	GetRepositoryByOwnerAndNameWithResponse(ctx context.Context, owner string, repository string, reqEditors ...RequestEditorFn) (*GetRepositoryByOwnerAndNameClientResponse, error)
+
+	// GetRepositoryLatestCommitWithResponse request
+	GetRepositoryLatestCommitWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryLatestCommitParams, reqEditors ...RequestEditorFn) (*GetRepositoryLatestCommitClientResponse, error)
+
+	// GetRepositoryReadmeWithResponse request
+	GetRepositoryReadmeWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryReadmeParams, reqEditors ...RequestEditorFn) (*GetRepositoryReadmeClientResponse, error)
+
+	// GetRepositoryTreeWithResponse request
+	GetRepositoryTreeWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryTreeParams, reqEditors ...RequestEditorFn) (*GetRepositoryTreeClientResponse, error)
+
+	// GetAuthenticatedUserWithResponse request
+	GetAuthenticatedUserWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthenticatedUserClientResponse, error)
+}
+
+type CreateClerkSignInTokenClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *CreateClerkSignInTokenResponse
+	JSON401      *Unauthorized
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateClerkSignInTokenClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateClerkSignInTokenClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListGitAccessTokensClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]GitAccessToken
+	JSON401      *Unauthorized
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListGitAccessTokensClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListGitAccessTokensClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateGitAccessTokenClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *CreateGitAccessTokenResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateGitAccessTokenClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateGitAccessTokenClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RevokeGitAccessTokenClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Unauthorized
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeGitAccessTokenClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeGitAccessTokenClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type HealthzClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Status *string `json:"status,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r HealthzClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r HealthzClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateRepositoryClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *CreateRepositoryResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON409      *Conflict
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateRepositoryClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateRepositoryClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetRepositoryByOwnerAndNameClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Repository
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRepositoryByOwnerAndNameClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRepositoryByOwnerAndNameClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetRepositoryLatestCommitClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RepositoryLatestCommit
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRepositoryLatestCommitClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRepositoryLatestCommitClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetRepositoryReadmeClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RepositoryReadme
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRepositoryReadmeClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRepositoryReadmeClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetRepositoryTreeClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *RepositoryTree
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRepositoryTreeClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRepositoryTreeClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetAuthenticatedUserClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *User
+	JSON401      *Unauthorized
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthenticatedUserClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthenticatedUserClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// CreateClerkSignInTokenWithResponse request returning *CreateClerkSignInTokenClientResponse
+func (c *ClientWithResponses) CreateClerkSignInTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CreateClerkSignInTokenClientResponse, error) {
+	rsp, err := c.CreateClerkSignInToken(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateClerkSignInTokenClientResponse(rsp)
+}
+
+// ListGitAccessTokensWithResponse request returning *ListGitAccessTokensClientResponse
+func (c *ClientWithResponses) ListGitAccessTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListGitAccessTokensClientResponse, error) {
+	rsp, err := c.ListGitAccessTokens(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListGitAccessTokensClientResponse(rsp)
+}
+
+// CreateGitAccessTokenWithBodyWithResponse request with arbitrary body returning *CreateGitAccessTokenClientResponse
+func (c *ClientWithResponses) CreateGitAccessTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGitAccessTokenClientResponse, error) {
+	rsp, err := c.CreateGitAccessTokenWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGitAccessTokenClientResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateGitAccessTokenWithResponse(ctx context.Context, body CreateGitAccessTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGitAccessTokenClientResponse, error) {
+	rsp, err := c.CreateGitAccessToken(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGitAccessTokenClientResponse(rsp)
+}
+
+// RevokeGitAccessTokenWithResponse request returning *RevokeGitAccessTokenClientResponse
+func (c *ClientWithResponses) RevokeGitAccessTokenWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*RevokeGitAccessTokenClientResponse, error) {
+	rsp, err := c.RevokeGitAccessToken(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeGitAccessTokenClientResponse(rsp)
+}
+
+// HealthzWithResponse request returning *HealthzClientResponse
+func (c *ClientWithResponses) HealthzWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthzClientResponse, error) {
+	rsp, err := c.Healthz(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseHealthzClientResponse(rsp)
+}
+
+// CreateRepositoryWithBodyWithResponse request with arbitrary body returning *CreateRepositoryClientResponse
+func (c *ClientWithResponses) CreateRepositoryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRepositoryClientResponse, error) {
+	rsp, err := c.CreateRepositoryWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateRepositoryClientResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateRepositoryWithResponse(ctx context.Context, body CreateRepositoryJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateRepositoryClientResponse, error) {
+	rsp, err := c.CreateRepository(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateRepositoryClientResponse(rsp)
+}
+
+// GetRepositoryByOwnerAndNameWithResponse request returning *GetRepositoryByOwnerAndNameClientResponse
+func (c *ClientWithResponses) GetRepositoryByOwnerAndNameWithResponse(ctx context.Context, owner string, repository string, reqEditors ...RequestEditorFn) (*GetRepositoryByOwnerAndNameClientResponse, error) {
+	rsp, err := c.GetRepositoryByOwnerAndName(ctx, owner, repository, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRepositoryByOwnerAndNameClientResponse(rsp)
+}
+
+// GetRepositoryLatestCommitWithResponse request returning *GetRepositoryLatestCommitClientResponse
+func (c *ClientWithResponses) GetRepositoryLatestCommitWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryLatestCommitParams, reqEditors ...RequestEditorFn) (*GetRepositoryLatestCommitClientResponse, error) {
+	rsp, err := c.GetRepositoryLatestCommit(ctx, owner, repository, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRepositoryLatestCommitClientResponse(rsp)
+}
+
+// GetRepositoryReadmeWithResponse request returning *GetRepositoryReadmeClientResponse
+func (c *ClientWithResponses) GetRepositoryReadmeWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryReadmeParams, reqEditors ...RequestEditorFn) (*GetRepositoryReadmeClientResponse, error) {
+	rsp, err := c.GetRepositoryReadme(ctx, owner, repository, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRepositoryReadmeClientResponse(rsp)
+}
+
+// GetRepositoryTreeWithResponse request returning *GetRepositoryTreeClientResponse
+func (c *ClientWithResponses) GetRepositoryTreeWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryTreeParams, reqEditors ...RequestEditorFn) (*GetRepositoryTreeClientResponse, error) {
+	rsp, err := c.GetRepositoryTree(ctx, owner, repository, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRepositoryTreeClientResponse(rsp)
+}
+
+// GetAuthenticatedUserWithResponse request returning *GetAuthenticatedUserClientResponse
+func (c *ClientWithResponses) GetAuthenticatedUserWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthenticatedUserClientResponse, error) {
+	rsp, err := c.GetAuthenticatedUser(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthenticatedUserClientResponse(rsp)
+}
+
+// ParseCreateClerkSignInTokenClientResponse parses an HTTP response from a CreateClerkSignInTokenWithResponse call
+func ParseCreateClerkSignInTokenClientResponse(rsp *http.Response) (*CreateClerkSignInTokenClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateClerkSignInTokenClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreateClerkSignInTokenResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListGitAccessTokensClientResponse parses an HTTP response from a ListGitAccessTokensWithResponse call
+func ParseListGitAccessTokensClientResponse(rsp *http.Response) (*ListGitAccessTokensClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListGitAccessTokensClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []GitAccessToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateGitAccessTokenClientResponse parses an HTTP response from a CreateGitAccessTokenWithResponse call
+func ParseCreateGitAccessTokenClientResponse(rsp *http.Response) (*CreateGitAccessTokenClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateGitAccessTokenClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreateGitAccessTokenResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRevokeGitAccessTokenClientResponse parses an HTTP response from a RevokeGitAccessTokenWithResponse call
+func ParseRevokeGitAccessTokenClientResponse(rsp *http.Response) (*RevokeGitAccessTokenClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeGitAccessTokenClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseHealthzClientResponse parses an HTTP response from a HealthzWithResponse call
+func ParseHealthzClientResponse(rsp *http.Response) (*HealthzClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &HealthzClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Status *string `json:"status,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateRepositoryClientResponse parses an HTTP response from a CreateRepositoryWithResponse call
+func ParseCreateRepositoryClientResponse(rsp *http.Response) (*CreateRepositoryClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateRepositoryClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreateRepositoryResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRepositoryByOwnerAndNameClientResponse parses an HTTP response from a GetRepositoryByOwnerAndNameWithResponse call
+func ParseGetRepositoryByOwnerAndNameClientResponse(rsp *http.Response) (*GetRepositoryByOwnerAndNameClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRepositoryByOwnerAndNameClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Repository
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRepositoryLatestCommitClientResponse parses an HTTP response from a GetRepositoryLatestCommitWithResponse call
+func ParseGetRepositoryLatestCommitClientResponse(rsp *http.Response) (*GetRepositoryLatestCommitClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRepositoryLatestCommitClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RepositoryLatestCommit
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRepositoryReadmeClientResponse parses an HTTP response from a GetRepositoryReadmeWithResponse call
+func ParseGetRepositoryReadmeClientResponse(rsp *http.Response) (*GetRepositoryReadmeClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRepositoryReadmeClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RepositoryReadme
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRepositoryTreeClientResponse parses an HTTP response from a GetRepositoryTreeWithResponse call
+func ParseGetRepositoryTreeClientResponse(rsp *http.Response) (*GetRepositoryTreeClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRepositoryTreeClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RepositoryTree
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthenticatedUserClientResponse parses an HTTP response from a GetAuthenticatedUserWithResponse call
+func ParseGetAuthenticatedUserClientResponse(rsp *http.Response) (*GetAuthenticatedUserClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthenticatedUserClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest User
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Create Clerk Sign-In Token
+	// (POST /v1/auth/clerk/sign-in-token)
+	CreateClerkSignInToken(c *gin.Context)
 	// List Git Access Tokens
 	// (GET /v1/git-access-tokens)
 	ListGitAccessTokens(c *gin.Context)
@@ -157,6 +1992,15 @@ type ServerInterface interface {
 	// Get Repository
 	// (GET /v1/repositories/{owner}/{repository})
 	GetRepositoryByOwnerAndName(c *gin.Context, owner string, repository string)
+	// Get Repository Latest Commit
+	// (GET /v1/repositories/{owner}/{repository}/latest-commit)
+	GetRepositoryLatestCommit(c *gin.Context, owner string, repository string, params GetRepositoryLatestCommitParams)
+	// Get Repository README
+	// (GET /v1/repositories/{owner}/{repository}/readme)
+	GetRepositoryReadme(c *gin.Context, owner string, repository string, params GetRepositoryReadmeParams)
+	// Get Repository Tree
+	// (GET /v1/repositories/{owner}/{repository}/tree)
+	GetRepositoryTree(c *gin.Context, owner string, repository string, params GetRepositoryTreeParams)
 	// Get Authenticated User
 	// (GET /v1/user)
 	GetAuthenticatedUser(c *gin.Context)
@@ -170,6 +2014,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
+
+// CreateClerkSignInToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateClerkSignInToken(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CreateClerkSignInToken(c)
+}
 
 // ListGitAccessTokens operation middleware
 func (siw *ServerInterfaceWrapper) ListGitAccessTokens(c *gin.Context) {
@@ -290,6 +2149,168 @@ func (siw *ServerInterfaceWrapper) GetRepositoryByOwnerAndName(c *gin.Context) {
 	siw.Handler.GetRepositoryByOwnerAndName(c, owner, repository)
 }
 
+// GetRepositoryLatestCommit operation middleware
+func (siw *ServerInterfaceWrapper) GetRepositoryLatestCommit(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", c.Param("owner"), &owner, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter owner: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "repository" -------------
+	var repository string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repository", c.Param("repository"), &repository, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter repository: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetRepositoryLatestCommitParams
+
+	// ------------- Optional query parameter "ref" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ref", c.Request.URL.Query(), &params.Ref, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter ref: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", c.Request.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter path: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetRepositoryLatestCommit(c, owner, repository, params)
+}
+
+// GetRepositoryReadme operation middleware
+func (siw *ServerInterfaceWrapper) GetRepositoryReadme(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", c.Param("owner"), &owner, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter owner: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "repository" -------------
+	var repository string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repository", c.Param("repository"), &repository, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter repository: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetRepositoryReadmeParams
+
+	// ------------- Optional query parameter "ref" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ref", c.Request.URL.Query(), &params.Ref, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter ref: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", c.Request.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter path: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetRepositoryReadme(c, owner, repository, params)
+}
+
+// GetRepositoryTree operation middleware
+func (siw *ServerInterfaceWrapper) GetRepositoryTree(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", c.Param("owner"), &owner, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter owner: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "repository" -------------
+	var repository string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repository", c.Param("repository"), &repository, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter repository: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetRepositoryTreeParams
+
+	// ------------- Optional query parameter "ref" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ref", c.Request.URL.Query(), &params.Ref, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter ref: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", c.Request.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter path: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetRepositoryTree(c, owner, repository, params)
+}
+
 // GetAuthenticatedUser operation middleware
 func (siw *ServerInterfaceWrapper) GetAuthenticatedUser(c *gin.Context) {
 
@@ -332,12 +2353,16 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
+	router.POST(options.BaseURL+"/v1/auth/clerk/sign-in-token", wrapper.CreateClerkSignInToken)
 	router.GET(options.BaseURL+"/v1/git-access-tokens", wrapper.ListGitAccessTokens)
 	router.POST(options.BaseURL+"/v1/git-access-tokens", wrapper.CreateGitAccessToken)
 	router.DELETE(options.BaseURL+"/v1/git-access-tokens/:id", wrapper.RevokeGitAccessToken)
 	router.GET(options.BaseURL+"/v1/healthz", wrapper.Healthz)
 	router.POST(options.BaseURL+"/v1/repositories", wrapper.CreateRepository)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository", wrapper.GetRepositoryByOwnerAndName)
+	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/latest-commit", wrapper.GetRepositoryLatestCommit)
+	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/readme", wrapper.GetRepositoryReadme)
+	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/tree", wrapper.GetRepositoryTree)
 	router.GET(options.BaseURL+"/v1/user", wrapper.GetAuthenticatedUser)
 }
 
@@ -350,6 +2375,42 @@ type InternalServerErrorJSONResponse Error
 type NotFoundJSONResponse Error
 
 type UnauthorizedJSONResponse Error
+
+type CreateClerkSignInTokenRequestObject struct {
+}
+
+type CreateClerkSignInTokenResponseObject interface {
+	VisitCreateClerkSignInTokenResponse(w http.ResponseWriter) error
+}
+
+type CreateClerkSignInToken200JSONResponse CreateClerkSignInTokenResponse
+
+func (response CreateClerkSignInToken200JSONResponse) VisitCreateClerkSignInTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateClerkSignInToken401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateClerkSignInToken401JSONResponse) VisitCreateClerkSignInTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateClerkSignInToken500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response CreateClerkSignInToken500JSONResponse) VisitCreateClerkSignInTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
 
 type ListGitAccessTokensRequestObject struct {
 }
@@ -589,6 +2650,177 @@ func (response GetRepositoryByOwnerAndName500JSONResponse) VisitGetRepositoryByO
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetRepositoryLatestCommitRequestObject struct {
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+	Params     GetRepositoryLatestCommitParams
+}
+
+type GetRepositoryLatestCommitResponseObject interface {
+	VisitGetRepositoryLatestCommitResponse(w http.ResponseWriter) error
+}
+
+type GetRepositoryLatestCommit200JSONResponse RepositoryLatestCommit
+
+func (response GetRepositoryLatestCommit200JSONResponse) VisitGetRepositoryLatestCommitResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryLatestCommit400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetRepositoryLatestCommit400JSONResponse) VisitGetRepositoryLatestCommitResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryLatestCommit401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetRepositoryLatestCommit401JSONResponse) VisitGetRepositoryLatestCommitResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryLatestCommit404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetRepositoryLatestCommit404JSONResponse) VisitGetRepositoryLatestCommitResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryLatestCommit500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetRepositoryLatestCommit500JSONResponse) VisitGetRepositoryLatestCommitResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryReadmeRequestObject struct {
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+	Params     GetRepositoryReadmeParams
+}
+
+type GetRepositoryReadmeResponseObject interface {
+	VisitGetRepositoryReadmeResponse(w http.ResponseWriter) error
+}
+
+type GetRepositoryReadme200JSONResponse RepositoryReadme
+
+func (response GetRepositoryReadme200JSONResponse) VisitGetRepositoryReadmeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryReadme400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetRepositoryReadme400JSONResponse) VisitGetRepositoryReadmeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryReadme401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetRepositoryReadme401JSONResponse) VisitGetRepositoryReadmeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryReadme404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetRepositoryReadme404JSONResponse) VisitGetRepositoryReadmeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryReadme500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetRepositoryReadme500JSONResponse) VisitGetRepositoryReadmeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryTreeRequestObject struct {
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+	Params     GetRepositoryTreeParams
+}
+
+type GetRepositoryTreeResponseObject interface {
+	VisitGetRepositoryTreeResponse(w http.ResponseWriter) error
+}
+
+type GetRepositoryTree200JSONResponse RepositoryTree
+
+func (response GetRepositoryTree200JSONResponse) VisitGetRepositoryTreeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryTree400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetRepositoryTree400JSONResponse) VisitGetRepositoryTreeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryTree401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetRepositoryTree401JSONResponse) VisitGetRepositoryTreeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryTree404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetRepositoryTree404JSONResponse) VisitGetRepositoryTreeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryTree500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetRepositoryTree500JSONResponse) VisitGetRepositoryTreeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetAuthenticatedUserRequestObject struct {
 }
 
@@ -627,6 +2859,9 @@ func (response GetAuthenticatedUser500JSONResponse) VisitGetAuthenticatedUserRes
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Create Clerk Sign-In Token
+	// (POST /v1/auth/clerk/sign-in-token)
+	CreateClerkSignInToken(ctx context.Context, request CreateClerkSignInTokenRequestObject) (CreateClerkSignInTokenResponseObject, error)
 	// List Git Access Tokens
 	// (GET /v1/git-access-tokens)
 	ListGitAccessTokens(ctx context.Context, request ListGitAccessTokensRequestObject) (ListGitAccessTokensResponseObject, error)
@@ -645,6 +2880,15 @@ type StrictServerInterface interface {
 	// Get Repository
 	// (GET /v1/repositories/{owner}/{repository})
 	GetRepositoryByOwnerAndName(ctx context.Context, request GetRepositoryByOwnerAndNameRequestObject) (GetRepositoryByOwnerAndNameResponseObject, error)
+	// Get Repository Latest Commit
+	// (GET /v1/repositories/{owner}/{repository}/latest-commit)
+	GetRepositoryLatestCommit(ctx context.Context, request GetRepositoryLatestCommitRequestObject) (GetRepositoryLatestCommitResponseObject, error)
+	// Get Repository README
+	// (GET /v1/repositories/{owner}/{repository}/readme)
+	GetRepositoryReadme(ctx context.Context, request GetRepositoryReadmeRequestObject) (GetRepositoryReadmeResponseObject, error)
+	// Get Repository Tree
+	// (GET /v1/repositories/{owner}/{repository}/tree)
+	GetRepositoryTree(ctx context.Context, request GetRepositoryTreeRequestObject) (GetRepositoryTreeResponseObject, error)
 	// Get Authenticated User
 	// (GET /v1/user)
 	GetAuthenticatedUser(ctx context.Context, request GetAuthenticatedUserRequestObject) (GetAuthenticatedUserResponseObject, error)
@@ -660,6 +2904,31 @@ func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareF
 type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
+}
+
+// CreateClerkSignInToken operation middleware
+func (sh *strictHandler) CreateClerkSignInToken(ctx *gin.Context) {
+	var request CreateClerkSignInTokenRequestObject
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateClerkSignInToken(ctx, request.(CreateClerkSignInTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateClerkSignInToken")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(CreateClerkSignInTokenResponseObject); ok {
+		if err := validResponse.VisitCreateClerkSignInTokenResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListGitAccessTokens operation middleware
@@ -826,6 +3095,93 @@ func (sh *strictHandler) GetRepositoryByOwnerAndName(ctx *gin.Context, owner str
 		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(GetRepositoryByOwnerAndNameResponseObject); ok {
 		if err := validResponse.VisitGetRepositoryByOwnerAndNameResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRepositoryLatestCommit operation middleware
+func (sh *strictHandler) GetRepositoryLatestCommit(ctx *gin.Context, owner string, repository string, params GetRepositoryLatestCommitParams) {
+	var request GetRepositoryLatestCommitRequestObject
+
+	request.Owner = owner
+	request.Repository = repository
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRepositoryLatestCommit(ctx, request.(GetRepositoryLatestCommitRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRepositoryLatestCommit")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(GetRepositoryLatestCommitResponseObject); ok {
+		if err := validResponse.VisitGetRepositoryLatestCommitResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRepositoryReadme operation middleware
+func (sh *strictHandler) GetRepositoryReadme(ctx *gin.Context, owner string, repository string, params GetRepositoryReadmeParams) {
+	var request GetRepositoryReadmeRequestObject
+
+	request.Owner = owner
+	request.Repository = repository
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRepositoryReadme(ctx, request.(GetRepositoryReadmeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRepositoryReadme")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(GetRepositoryReadmeResponseObject); ok {
+		if err := validResponse.VisitGetRepositoryReadmeResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRepositoryTree operation middleware
+func (sh *strictHandler) GetRepositoryTree(ctx *gin.Context, owner string, repository string, params GetRepositoryTreeParams) {
+	var request GetRepositoryTreeRequestObject
+
+	request.Owner = owner
+	request.Repository = repository
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRepositoryTree(ctx, request.(GetRepositoryTreeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRepositoryTree")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(GetRepositoryTreeResponseObject); ok {
+		if err := validResponse.VisitGetRepositoryTreeResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {

@@ -3,9 +3,11 @@ package api
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/floffah/catena/internal/pkg/db"
+	"github.com/floffah/catena/internal/pkg/gitstore"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -92,7 +94,7 @@ func (s *Server) CreateRepository(ctx context.Context, request CreateRepositoryR
 		}, nil
 	}
 
-	repoResponse, err := RepositoryToAPI(repository)
+	repoResponse, err := RepositoryToAPI(repository, user.Name)
 	if err != nil {
 		tx.Rollback(ctx)
 		return CreateRepository500JSONResponse{
@@ -114,7 +116,7 @@ func (s *Server) CreateRepository(ctx context.Context, request CreateRepositoryR
 		Id:            repoResponse.Id,
 		Name:          repoResponse.Name,
 		OwnerId:       repoResponse.OwnerId,
-		OwnerName:     user.Name,
+		OwnerName:     repoResponse.OwnerName,
 		UpdatedAt:     repoResponse.UpdatedAt,
 		Visibility:    repoResponse.Visibility,
 	}
@@ -123,44 +125,25 @@ func (s *Server) CreateRepository(ctx context.Context, request CreateRepositoryR
 }
 
 func (s *Server) GetRepositoryByOwnerAndName(ctx context.Context, request GetRepositoryByOwnerAndNameRequestObject) (GetRepositoryByOwnerAndNameResponseObject, error) {
-	repository, err := s.repository.GetRepositoryByOwnerAndName(ctx, db.GetRepositoryByOwnerAndNameParams{
-		OwnerName:      request.Owner,
-		RepositoryName: request.Repository,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return GetRepositoryByOwnerAndName404JSONResponse{
-				NotFoundJSONResponse: NotFoundJSONResponse{Error: "repository not found"},
-			}, nil
-		}
-
-		return GetRepositoryByOwnerAndName500JSONResponse{
-			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load repository"},
-		}, nil
-	}
-
-	if repository.Visibility == db.RepositoryVisibilityPrivate {
-		authUser, err := s.auth.GetUserFromContext(ctx)
-		if err != nil {
+	repository, accessErr := s.getAccessibleRepository(ctx, request.Owner, request.Repository)
+	if accessErr != nil {
+		switch accessErr.Status {
+		case http.StatusUnauthorized:
 			return GetRepositoryByOwnerAndName401JSONResponse{
-				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
+				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: accessErr.Message},
 			}, nil
-		}
-		if authUser == nil {
-			return GetRepositoryByOwnerAndName401JSONResponse{
-				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
-			}, nil
-		}
-
-		user, err := s.repository.GetUserByClerkUserID(ctx, authUser.ID)
-		if err != nil || user.ID != repository.OwnerID {
+		case http.StatusNotFound:
 			return GetRepositoryByOwnerAndName404JSONResponse{
-				NotFoundJSONResponse: NotFoundJSONResponse{Error: "repository not found"},
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: accessErr.Message},
+			}, nil
+		default:
+			return GetRepositoryByOwnerAndName500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: accessErr.Message},
 			}, nil
 		}
 	}
 
-	response, err := RepositoryToAPI(repository)
+	response, err := RepositoryToAPI(repository, request.Owner)
 	if err != nil {
 		return GetRepositoryByOwnerAndName500JSONResponse{
 			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to encode repository"},
@@ -168,4 +151,242 @@ func (s *Server) GetRepositoryByOwnerAndName(ctx context.Context, request GetRep
 	}
 
 	return GetRepositoryByOwnerAndName200JSONResponse(response), nil
+}
+
+func (s *Server) GetRepositoryReadme(ctx context.Context, request GetRepositoryReadmeRequestObject) (GetRepositoryReadmeResponseObject, error) {
+	repository, accessErr := s.getAccessibleRepository(ctx, request.Owner, request.Repository)
+	if accessErr != nil {
+		switch accessErr.Status {
+		case http.StatusUnauthorized:
+			return GetRepositoryReadme401JSONResponse{
+				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: accessErr.Message},
+			}, nil
+		case http.StatusNotFound:
+			return GetRepositoryReadme404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: accessErr.Message},
+			}, nil
+		default:
+			return GetRepositoryReadme500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: accessErr.Message},
+			}, nil
+		}
+	}
+
+	ref := ""
+	if request.Params.Ref != nil {
+		ref = strings.TrimSpace(*request.Params.Ref)
+	}
+
+	directory := ""
+	if request.Params.Path != nil {
+		directory = strings.TrimSpace(*request.Params.Path)
+	}
+
+	readme, err := s.git.GetReadme(ctx, repository, ref, directory)
+	if err != nil {
+		switch {
+		case errors.Is(err, gitstore.ErrInvalidPath), errors.Is(err, gitstore.ErrInvalidRef):
+			return GetRepositoryReadme400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: err.Error()},
+			}, nil
+		case errors.Is(err, gitstore.ErrReadmeNotFound):
+			return GetRepositoryReadme404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: "readme not found"},
+			}, nil
+		case errors.Is(err, gitstore.ErrReadmeTooLarge):
+			return GetRepositoryReadme400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: "readme is too large"},
+			}, nil
+		default:
+			return GetRepositoryReadme500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load readme"},
+			}, nil
+		}
+	}
+
+	return GetRepositoryReadme200JSONResponse{
+		CommitOid: readme.CommitOID,
+		Content:   readme.Content,
+		Encoding:  "utf-8",
+		Name:      readme.Name,
+		Oid:       readme.OID,
+		Path:      readme.Path,
+		Ref:       readme.Ref,
+		Size:      readme.Size,
+	}, nil
+}
+
+func (s *Server) GetRepositoryLatestCommit(ctx context.Context, request GetRepositoryLatestCommitRequestObject) (GetRepositoryLatestCommitResponseObject, error) {
+	repository, accessErr := s.getAccessibleRepository(ctx, request.Owner, request.Repository)
+	if accessErr != nil {
+		switch accessErr.Status {
+		case http.StatusUnauthorized:
+			return GetRepositoryLatestCommit401JSONResponse{
+				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: accessErr.Message},
+			}, nil
+		case http.StatusNotFound:
+			return GetRepositoryLatestCommit404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: accessErr.Message},
+			}, nil
+		default:
+			return GetRepositoryLatestCommit500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: accessErr.Message},
+			}, nil
+		}
+	}
+
+	ref := ""
+	if request.Params.Ref != nil {
+		ref = strings.TrimSpace(*request.Params.Ref)
+	}
+
+	path := ""
+	if request.Params.Path != nil {
+		path = strings.TrimSpace(*request.Params.Path)
+	}
+
+	commit, err := s.git.GetLatestCommit(ctx, repository, ref, path)
+	if err != nil {
+		switch {
+		case errors.Is(err, gitstore.ErrInvalidPath), errors.Is(err, gitstore.ErrInvalidRef):
+			return GetRepositoryLatestCommit400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: err.Error()},
+			}, nil
+		case errors.Is(err, gitstore.ErrCommitNotFound):
+			return GetRepositoryLatestCommit404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: "commit not found"},
+			}, nil
+		default:
+			return GetRepositoryLatestCommit500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load latest commit"},
+			}, nil
+		}
+	}
+
+	return GetRepositoryLatestCommit200JSONResponse{
+		AuthorEmail:     commit.AuthorEmail,
+		AuthorName:      commit.AuthorName,
+		AuthoredAt:      commit.AuthoredAt,
+		CommitOid:       commit.CommitOID,
+		CommittedAt:     commit.CommittedAt,
+		CommitterEmail:  commit.CommitterEmail,
+		CommitterName:   commit.CommitterName,
+		Message:         commit.Message,
+		MessageHeadline: commit.MessageHeadline,
+		Ref:             commit.Ref,
+		ShortOid:        commit.ShortOID,
+	}, nil
+}
+
+func (s *Server) GetRepositoryTree(ctx context.Context, request GetRepositoryTreeRequestObject) (GetRepositoryTreeResponseObject, error) {
+	repository, accessErr := s.getAccessibleRepository(ctx, request.Owner, request.Repository)
+	if accessErr != nil {
+		switch accessErr.Status {
+		case http.StatusUnauthorized:
+			return GetRepositoryTree401JSONResponse{
+				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: accessErr.Message},
+			}, nil
+		case http.StatusNotFound:
+			return GetRepositoryTree404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: accessErr.Message},
+			}, nil
+		default:
+			return GetRepositoryTree500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: accessErr.Message},
+			}, nil
+		}
+	}
+
+	ref := ""
+	if request.Params.Ref != nil {
+		ref = strings.TrimSpace(*request.Params.Ref)
+	}
+
+	directory := ""
+	if request.Params.Path != nil {
+		directory = strings.TrimSpace(*request.Params.Path)
+	}
+
+	tree, err := s.git.GetTree(ctx, repository, ref, directory)
+	if err != nil {
+		switch {
+		case errors.Is(err, gitstore.ErrInvalidPath), errors.Is(err, gitstore.ErrInvalidRef):
+			return GetRepositoryTree400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: err.Error()},
+			}, nil
+		case errors.Is(err, gitstore.ErrTreeNotFound):
+			return GetRepositoryTree404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: "tree not found"},
+			}, nil
+		default:
+			return GetRepositoryTree500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load tree"},
+			}, nil
+		}
+	}
+
+	entries := make([]RepositoryTreeEntry, 0, len(tree.Entries))
+	for _, entry := range tree.Entries {
+		entries = append(entries, RepositoryTreeEntry{
+			Name: entry.Name,
+			Oid:  entry.OID,
+			Path: entry.Path,
+			Size: entry.Size,
+			Type: RepositoryTreeEntryType(entry.Type),
+		})
+	}
+
+	return GetRepositoryTree200JSONResponse{
+		CommitOid: tree.CommitOID,
+		Entries:   entries,
+		Path:      tree.Path,
+		Ref:       tree.Ref,
+	}, nil
+}
+
+type repositoryAccessError struct {
+	Status  int
+	Message string
+}
+
+func (s *Server) getAccessibleRepository(ctx context.Context, ownerName string, repositoryName string) (db.Repository, *repositoryAccessError) {
+	repository, err := s.repository.GetRepositoryByOwnerAndName(ctx, db.GetRepositoryByOwnerAndNameParams{
+		OwnerName:      ownerName,
+		RepositoryName: repositoryName,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return db.Repository{}, &repositoryAccessError{
+				Status:  http.StatusNotFound,
+				Message: "repository not found",
+			}
+		}
+
+		return db.Repository{}, &repositoryAccessError{
+			Status:  http.StatusInternalServerError,
+			Message: "failed to load repository",
+		}
+	}
+
+	if repository.Visibility != db.RepositoryVisibilityPrivate {
+		return repository, nil
+	}
+
+	authUser, err := s.auth.GetUserFromContext(ctx)
+	if err != nil || authUser == nil {
+		return db.Repository{}, &repositoryAccessError{
+			Status:  http.StatusUnauthorized,
+			Message: "unauthorized",
+		}
+	}
+
+	user, err := s.repository.GetUserByClerkUserID(ctx, authUser.ID)
+	if err != nil || user.ID != repository.OwnerID {
+		return db.Repository{}, &repositoryAccessError{
+			Status:  http.StatusNotFound,
+			Message: "repository not found",
+		}
+	}
+
+	return repository, nil
 }

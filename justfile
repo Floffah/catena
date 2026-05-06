@@ -6,8 +6,17 @@ alias da := dev-api
 alias dw := dev-web
 alias d := dev
 
+# These are embedded so we can distribute the CLI without telling users our clerk publishable key (secret should never be embedded)
+common_ldflags := "-X github.com/floffah/catena/internal/pkg/auth.ClerkPublishableKey=$CLERK_PUBLISHABLE_KEY -X github.com/floffah/catena/internal/pkg/auth.ClerkFrontendApiUrl=$CLERK_FRONTEND_API_URL"
+cli_ldflags := common_ldflags
+api_ldflags := common_ldflags
+
 default:
     @just --list
+
+build:
+	go build -ldflags="{{cli_ldflags}}" -o build/catena cmd/catena/catena.go
+	go build -ldflags="{{api_ldflags}}" -o build/api cmd/api/api.go
 
 generate:
 	go generate ./...

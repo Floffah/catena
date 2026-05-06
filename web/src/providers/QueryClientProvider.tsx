@@ -6,7 +6,9 @@ import {
 } from "@tanstack/react-query";
 import { PropsWithChildren } from "react";
 
-const queryClient = new QueryClient();
+import { createQueryClient } from "@/lib/queryClient";
+
+const queryClient = createQueryClient();
 
 export default function QueryClientProvider({ children }: PropsWithChildren) {
     return <TRQProvider client={queryClient}>{children}</TRQProvider>;
