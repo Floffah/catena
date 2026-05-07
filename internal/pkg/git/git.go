@@ -31,6 +31,12 @@ type CommitSummary struct {
 	CommittedAt     time.Time
 }
 
+type Ref struct {
+	Name string
+	Type string
+	OID  string
+}
+
 // Git client, currently just a backend for gitstore and git binary, but eventually will incorporate go-git
 type Git struct {
 	BinaryPath string
@@ -72,6 +78,39 @@ func (g Git) ResolveCommit(ctx context.Context, repoPath string, ref string) (st
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+func (g Git) ListRefs(ctx context.Context, repoPath string) ([]Ref, error) {
+	cmd := exec.CommandContext(ctx, g.BinaryPath, "-C", repoPath, "for-each-ref", "--format=%(refname:short)%09%(objecttype)%09%(objectname)", "refs/heads", "refs/tags")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	records := strings.Split(strings.TrimSpace(string(output)), "\n")
+	refs := make([]Ref, 0, len(records))
+	for _, record := range records {
+		if record == "" {
+			continue
+		}
+
+		name, rest, ok := strings.Cut(record, "\t")
+		if !ok {
+			return nil, fmt.Errorf("failed to parse for-each-ref output")
+		}
+		refType, oid, ok := strings.Cut(rest, "\t")
+		if !ok {
+			return nil, fmt.Errorf("failed to parse for-each-ref output")
+		}
+
+		refs = append(refs, Ref{
+			Name: name,
+			Type: refType,
+			OID:  oid,
+		})
+	}
+
+	return refs, nil
 }
 
 func (g Git) LsTreePath(ctx context.Context, repoPath string, commitOID string, filePath string) (*TreeEntry, error) {

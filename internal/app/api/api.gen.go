@@ -24,21 +24,36 @@ const (
 	BearerAuthScopes = "bearerAuth.Scopes"
 )
 
+// Defines values for RepositoryRefType.
+const (
+	Branch RepositoryRefType = "branch"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryRefType enum.
+func (e RepositoryRefType) Valid() bool {
+	switch e {
+	case Branch:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RepositoryTreeEntryType.
 const (
-	Blob   RepositoryTreeEntryType = "blob"
-	Commit RepositoryTreeEntryType = "commit"
-	Tree   RepositoryTreeEntryType = "tree"
+	RepositoryTreeEntryTypeBlob   RepositoryTreeEntryType = "blob"
+	RepositoryTreeEntryTypeCommit RepositoryTreeEntryType = "commit"
+	RepositoryTreeEntryTypeTree   RepositoryTreeEntryType = "tree"
 )
 
 // Valid indicates whether the value is a known member of the RepositoryTreeEntryType enum.
 func (e RepositoryTreeEntryType) Valid() bool {
 	switch e {
-	case Blob:
+	case RepositoryTreeEntryTypeBlob:
 		return true
-	case Commit:
+	case RepositoryTreeEntryTypeCommit:
 		return true
-	case Tree:
+	case RepositoryTreeEntryTypeTree:
 		return true
 	default:
 		return false
@@ -57,6 +72,30 @@ func (e RepositoryVisibility) Valid() bool {
 	case Private:
 		return true
 	case Public:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolvedRepositoryGitPathPathType.
+const (
+	ResolvedRepositoryGitPathPathTypeBlob   ResolvedRepositoryGitPathPathType = "blob"
+	ResolvedRepositoryGitPathPathTypeCommit ResolvedRepositoryGitPathPathType = "commit"
+	ResolvedRepositoryGitPathPathTypeRoot   ResolvedRepositoryGitPathPathType = "root"
+	ResolvedRepositoryGitPathPathTypeTree   ResolvedRepositoryGitPathPathType = "tree"
+)
+
+// Valid indicates whether the value is a known member of the ResolvedRepositoryGitPathPathType enum.
+func (e ResolvedRepositoryGitPathPathType) Valid() bool {
+	switch e {
+	case ResolvedRepositoryGitPathPathTypeBlob:
+		return true
+	case ResolvedRepositoryGitPathPathTypeCommit:
+		return true
+	case ResolvedRepositoryGitPathPathTypeRoot:
+		return true
+	case ResolvedRepositoryGitPathPathTypeTree:
 		return true
 	default:
 		return false
@@ -121,6 +160,11 @@ type GitAccessToken struct {
 	UpdatedAt   time.Time          `json:"updatedAt"`
 }
 
+// ListRepositoryRefsResponse defines model for ListRepositoryRefsResponse.
+type ListRepositoryRefsResponse struct {
+	Refs []RepositoryRef `json:"refs"`
+}
+
 // Repository defines model for Repository.
 type Repository struct {
 	CreatedAt     time.Time            `json:"createdAt"`
@@ -161,6 +205,17 @@ type RepositoryReadme struct {
 	Size      int64  `json:"size"`
 }
 
+// RepositoryRef defines model for RepositoryRef.
+type RepositoryRef struct {
+	CommitOid string            `json:"commitOid"`
+	IsDefault bool              `json:"isDefault"`
+	Name      string            `json:"name"`
+	Type      RepositoryRefType `json:"type"`
+}
+
+// RepositoryRefType defines model for RepositoryRefType.
+type RepositoryRefType string
+
 // RepositoryTree defines model for RepositoryTree.
 type RepositoryTree struct {
 	CommitOid string                `json:"commitOid"`
@@ -183,6 +238,17 @@ type RepositoryTreeEntryType string
 
 // RepositoryVisibility defines model for RepositoryVisibility.
 type RepositoryVisibility string
+
+// ResolvedRepositoryGitPath defines model for ResolvedRepositoryGitPath.
+type ResolvedRepositoryGitPath struct {
+	CommitOid string                            `json:"commitOid"`
+	Path      string                            `json:"path"`
+	PathType  ResolvedRepositoryGitPathPathType `json:"pathType"`
+	Ref       string                            `json:"ref"`
+}
+
+// ResolvedRepositoryGitPathPathType defines model for ResolvedRepositoryGitPath.PathType.
+type ResolvedRepositoryGitPathPathType string
 
 // User defines model for User.
 type User struct {
@@ -209,6 +275,12 @@ type NotFound = Error
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
+// ResolveRepositoryGitPathParams defines parameters for ResolveRepositoryGitPath.
+type ResolveRepositoryGitPathParams struct {
+	// Path Ambiguous path containing a ref followed by an optional repository path.
+	Path string `form:"path" json:"path"`
+}
+
 // GetRepositoryLatestCommitParams defines parameters for GetRepositoryLatestCommit.
 type GetRepositoryLatestCommitParams struct {
 	// Ref Branch, tag, or commit to read from. Defaults to the repository default branch.
@@ -225,6 +297,12 @@ type GetRepositoryReadmeParams struct {
 
 	// Path Directory path to search for a README in. Defaults to the repository root.
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// ListRepositoryRefsParams defines parameters for ListRepositoryRefs.
+type ListRepositoryRefsParams struct {
+	// Type Ref type to list. Currently only `branch` is supported.
+	Type *RepositoryRefType `form:"type,omitempty" json:"type,omitempty"`
 }
 
 // GetRepositoryTreeParams defines parameters for GetRepositoryTree.
@@ -340,11 +418,17 @@ type ClientInterface interface {
 	// GetRepositoryByOwnerAndName request
 	GetRepositoryByOwnerAndName(ctx context.Context, owner string, repository string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ResolveRepositoryGitPath request
+	ResolveRepositoryGitPath(ctx context.Context, owner string, repository string, params *ResolveRepositoryGitPathParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetRepositoryLatestCommit request
 	GetRepositoryLatestCommit(ctx context.Context, owner string, repository string, params *GetRepositoryLatestCommitParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRepositoryReadme request
 	GetRepositoryReadme(ctx context.Context, owner string, repository string, params *GetRepositoryReadmeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListRepositoryRefs request
+	ListRepositoryRefs(ctx context.Context, owner string, repository string, params *ListRepositoryRefsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRepositoryTree request
 	GetRepositoryTree(ctx context.Context, owner string, repository string, params *GetRepositoryTreeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -461,6 +545,18 @@ func (c *Client) GetRepositoryByOwnerAndName(ctx context.Context, owner string, 
 	return c.Client.Do(req)
 }
 
+func (c *Client) ResolveRepositoryGitPath(ctx context.Context, owner string, repository string, params *ResolveRepositoryGitPathParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResolveRepositoryGitPathRequest(c.Server, owner, repository, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetRepositoryLatestCommit(ctx context.Context, owner string, repository string, params *GetRepositoryLatestCommitParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetRepositoryLatestCommitRequest(c.Server, owner, repository, params)
 	if err != nil {
@@ -475,6 +571,18 @@ func (c *Client) GetRepositoryLatestCommit(ctx context.Context, owner string, re
 
 func (c *Client) GetRepositoryReadme(ctx context.Context, owner string, repository string, params *GetRepositoryReadmeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetRepositoryReadmeRequest(c.Server, owner, repository, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListRepositoryRefs(ctx context.Context, owner string, repository string, params *ListRepositoryRefsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListRepositoryRefsRequest(c.Server, owner, repository, params)
 	if err != nil {
 		return nil, err
 	}
@@ -745,6 +853,65 @@ func NewGetRepositoryByOwnerAndNameRequest(server string, owner string, reposito
 	return req, nil
 }
 
+// NewResolveRepositoryGitPathRequest generates requests for ResolveRepositoryGitPath
+func NewResolveRepositoryGitPathRequest(server string, owner string, repository string, params *ResolveRepositoryGitPathParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "owner", owner, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "repository", repository, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/repositories/%s/%s/git-path/resolve", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetRepositoryLatestCommitRequest generates requests for GetRepositoryLatestCommit
 func NewGetRepositoryLatestCommitRequest(server string, owner string, repository string, params *GetRepositoryLatestCommitParams) (*http.Request, error) {
 	var err error
@@ -879,6 +1046,69 @@ func NewGetRepositoryReadmeRequest(server string, owner string, repository strin
 		if params.Path != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListRepositoryRefsRequest generates requests for ListRepositoryRefs
+func NewListRepositoryRefsRequest(server string, owner string, repository string, params *ListRepositoryRefsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "owner", owner, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "repository", repository, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/repositories/%s/%s/refs", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Type != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "type", *params.Type, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -1077,11 +1307,17 @@ type ClientWithResponsesInterface interface {
 	// GetRepositoryByOwnerAndNameWithResponse request
 	GetRepositoryByOwnerAndNameWithResponse(ctx context.Context, owner string, repository string, reqEditors ...RequestEditorFn) (*GetRepositoryByOwnerAndNameClientResponse, error)
 
+	// ResolveRepositoryGitPathWithResponse request
+	ResolveRepositoryGitPathWithResponse(ctx context.Context, owner string, repository string, params *ResolveRepositoryGitPathParams, reqEditors ...RequestEditorFn) (*ResolveRepositoryGitPathClientResponse, error)
+
 	// GetRepositoryLatestCommitWithResponse request
 	GetRepositoryLatestCommitWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryLatestCommitParams, reqEditors ...RequestEditorFn) (*GetRepositoryLatestCommitClientResponse, error)
 
 	// GetRepositoryReadmeWithResponse request
 	GetRepositoryReadmeWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryReadmeParams, reqEditors ...RequestEditorFn) (*GetRepositoryReadmeClientResponse, error)
+
+	// ListRepositoryRefsWithResponse request
+	ListRepositoryRefsWithResponse(ctx context.Context, owner string, repository string, params *ListRepositoryRefsParams, reqEditors ...RequestEditorFn) (*ListRepositoryRefsClientResponse, error)
 
 	// GetRepositoryTreeWithResponse request
 	GetRepositoryTreeWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryTreeParams, reqEditors ...RequestEditorFn) (*GetRepositoryTreeClientResponse, error)
@@ -1261,6 +1497,32 @@ func (r GetRepositoryByOwnerAndNameClientResponse) StatusCode() int {
 	return 0
 }
 
+type ResolveRepositoryGitPathClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ResolvedRepositoryGitPath
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r ResolveRepositoryGitPathClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResolveRepositoryGitPathClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetRepositoryLatestCommitClientResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1307,6 +1569,32 @@ func (r GetRepositoryReadmeClientResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetRepositoryReadmeClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListRepositoryRefsClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListRepositoryRefsResponse
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListRepositoryRefsClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListRepositoryRefsClientResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1442,6 +1730,15 @@ func (c *ClientWithResponses) GetRepositoryByOwnerAndNameWithResponse(ctx contex
 	return ParseGetRepositoryByOwnerAndNameClientResponse(rsp)
 }
 
+// ResolveRepositoryGitPathWithResponse request returning *ResolveRepositoryGitPathClientResponse
+func (c *ClientWithResponses) ResolveRepositoryGitPathWithResponse(ctx context.Context, owner string, repository string, params *ResolveRepositoryGitPathParams, reqEditors ...RequestEditorFn) (*ResolveRepositoryGitPathClientResponse, error) {
+	rsp, err := c.ResolveRepositoryGitPath(ctx, owner, repository, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResolveRepositoryGitPathClientResponse(rsp)
+}
+
 // GetRepositoryLatestCommitWithResponse request returning *GetRepositoryLatestCommitClientResponse
 func (c *ClientWithResponses) GetRepositoryLatestCommitWithResponse(ctx context.Context, owner string, repository string, params *GetRepositoryLatestCommitParams, reqEditors ...RequestEditorFn) (*GetRepositoryLatestCommitClientResponse, error) {
 	rsp, err := c.GetRepositoryLatestCommit(ctx, owner, repository, params, reqEditors...)
@@ -1458,6 +1755,15 @@ func (c *ClientWithResponses) GetRepositoryReadmeWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseGetRepositoryReadmeClientResponse(rsp)
+}
+
+// ListRepositoryRefsWithResponse request returning *ListRepositoryRefsClientResponse
+func (c *ClientWithResponses) ListRepositoryRefsWithResponse(ctx context.Context, owner string, repository string, params *ListRepositoryRefsParams, reqEditors ...RequestEditorFn) (*ListRepositoryRefsClientResponse, error) {
+	rsp, err := c.ListRepositoryRefs(ctx, owner, repository, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListRepositoryRefsClientResponse(rsp)
 }
 
 // GetRepositoryTreeWithResponse request returning *GetRepositoryTreeClientResponse
@@ -1767,6 +2073,60 @@ func ParseGetRepositoryByOwnerAndNameClientResponse(rsp *http.Response) (*GetRep
 	return response, nil
 }
 
+// ParseResolveRepositoryGitPathClientResponse parses an HTTP response from a ResolveRepositoryGitPathWithResponse call
+func ParseResolveRepositoryGitPathClientResponse(rsp *http.Response) (*ResolveRepositoryGitPathClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResolveRepositoryGitPathClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ResolvedRepositoryGitPath
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetRepositoryLatestCommitClientResponse parses an HTTP response from a GetRepositoryLatestCommitWithResponse call
 func ParseGetRepositoryLatestCommitClientResponse(rsp *http.Response) (*GetRepositoryLatestCommitClientResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1837,6 +2197,60 @@ func ParseGetRepositoryReadmeClientResponse(rsp *http.Response) (*GetRepositoryR
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest RepositoryReadme
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListRepositoryRefsClientResponse parses an HTTP response from a ListRepositoryRefsWithResponse call
+func ParseListRepositoryRefsClientResponse(rsp *http.Response) (*ListRepositoryRefsClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListRepositoryRefsClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListRepositoryRefsResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1992,12 +2406,18 @@ type ServerInterface interface {
 	// Get Repository
 	// (GET /v1/repositories/{owner}/{repository})
 	GetRepositoryByOwnerAndName(c *gin.Context, owner string, repository string)
+	// Resolve Repository Git Path
+	// (GET /v1/repositories/{owner}/{repository}/git-path/resolve)
+	ResolveRepositoryGitPath(c *gin.Context, owner string, repository string, params ResolveRepositoryGitPathParams)
 	// Get Repository Latest Commit
 	// (GET /v1/repositories/{owner}/{repository}/latest-commit)
 	GetRepositoryLatestCommit(c *gin.Context, owner string, repository string, params GetRepositoryLatestCommitParams)
 	// Get Repository README
 	// (GET /v1/repositories/{owner}/{repository}/readme)
 	GetRepositoryReadme(c *gin.Context, owner string, repository string, params GetRepositoryReadmeParams)
+	// List Repository Refs
+	// (GET /v1/repositories/{owner}/{repository}/refs)
+	ListRepositoryRefs(c *gin.Context, owner string, repository string, params ListRepositoryRefsParams)
 	// Get Repository Tree
 	// (GET /v1/repositories/{owner}/{repository}/tree)
 	GetRepositoryTree(c *gin.Context, owner string, repository string, params GetRepositoryTreeParams)
@@ -2149,6 +2569,59 @@ func (siw *ServerInterfaceWrapper) GetRepositoryByOwnerAndName(c *gin.Context) {
 	siw.Handler.GetRepositoryByOwnerAndName(c, owner, repository)
 }
 
+// ResolveRepositoryGitPath operation middleware
+func (siw *ServerInterfaceWrapper) ResolveRepositoryGitPath(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", c.Param("owner"), &owner, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter owner: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "repository" -------------
+	var repository string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repository", c.Param("repository"), &repository, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter repository: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ResolveRepositoryGitPathParams
+
+	// ------------- Required query parameter "path" -------------
+
+	if paramValue := c.Query("path"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument path is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", c.Request.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter path: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ResolveRepositoryGitPath(c, owner, repository, params)
+}
+
 // GetRepositoryLatestCommit operation middleware
 func (siw *ServerInterfaceWrapper) GetRepositoryLatestCommit(c *gin.Context) {
 
@@ -2257,6 +2730,52 @@ func (siw *ServerInterfaceWrapper) GetRepositoryReadme(c *gin.Context) {
 	siw.Handler.GetRepositoryReadme(c, owner, repository, params)
 }
 
+// ListRepositoryRefs operation middleware
+func (siw *ServerInterfaceWrapper) ListRepositoryRefs(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", c.Param("owner"), &owner, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter owner: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "repository" -------------
+	var repository string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repository", c.Param("repository"), &repository, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter repository: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRepositoryRefsParams
+
+	// ------------- Optional query parameter "type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "type", c.Request.URL.Query(), &params.Type, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter type: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListRepositoryRefs(c, owner, repository, params)
+}
+
 // GetRepositoryTree operation middleware
 func (siw *ServerInterfaceWrapper) GetRepositoryTree(c *gin.Context) {
 
@@ -2360,8 +2879,10 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/v1/healthz", wrapper.Healthz)
 	router.POST(options.BaseURL+"/v1/repositories", wrapper.CreateRepository)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository", wrapper.GetRepositoryByOwnerAndName)
+	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/git-path/resolve", wrapper.ResolveRepositoryGitPath)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/latest-commit", wrapper.GetRepositoryLatestCommit)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/readme", wrapper.GetRepositoryReadme)
+	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/refs", wrapper.ListRepositoryRefs)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/tree", wrapper.GetRepositoryTree)
 	router.GET(options.BaseURL+"/v1/user", wrapper.GetAuthenticatedUser)
 }
@@ -2650,6 +3171,63 @@ func (response GetRepositoryByOwnerAndName500JSONResponse) VisitGetRepositoryByO
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ResolveRepositoryGitPathRequestObject struct {
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+	Params     ResolveRepositoryGitPathParams
+}
+
+type ResolveRepositoryGitPathResponseObject interface {
+	VisitResolveRepositoryGitPathResponse(w http.ResponseWriter) error
+}
+
+type ResolveRepositoryGitPath200JSONResponse ResolvedRepositoryGitPath
+
+func (response ResolveRepositoryGitPath200JSONResponse) VisitResolveRepositoryGitPathResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ResolveRepositoryGitPath400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ResolveRepositoryGitPath400JSONResponse) VisitResolveRepositoryGitPathResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ResolveRepositoryGitPath401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ResolveRepositoryGitPath401JSONResponse) VisitResolveRepositoryGitPathResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ResolveRepositoryGitPath404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ResolveRepositoryGitPath404JSONResponse) VisitResolveRepositoryGitPathResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ResolveRepositoryGitPath500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response ResolveRepositoryGitPath500JSONResponse) VisitResolveRepositoryGitPathResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetRepositoryLatestCommitRequestObject struct {
 	Owner      string `json:"owner"`
 	Repository string `json:"repository"`
@@ -2758,6 +3336,63 @@ type GetRepositoryReadme500JSONResponse struct {
 }
 
 func (response GetRepositoryReadme500JSONResponse) VisitGetRepositoryReadmeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListRepositoryRefsRequestObject struct {
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+	Params     ListRepositoryRefsParams
+}
+
+type ListRepositoryRefsResponseObject interface {
+	VisitListRepositoryRefsResponse(w http.ResponseWriter) error
+}
+
+type ListRepositoryRefs200JSONResponse ListRepositoryRefsResponse
+
+func (response ListRepositoryRefs200JSONResponse) VisitListRepositoryRefsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListRepositoryRefs400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListRepositoryRefs400JSONResponse) VisitListRepositoryRefsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListRepositoryRefs401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListRepositoryRefs401JSONResponse) VisitListRepositoryRefsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListRepositoryRefs404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListRepositoryRefs404JSONResponse) VisitListRepositoryRefsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListRepositoryRefs500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response ListRepositoryRefs500JSONResponse) VisitListRepositoryRefsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -2880,12 +3515,18 @@ type StrictServerInterface interface {
 	// Get Repository
 	// (GET /v1/repositories/{owner}/{repository})
 	GetRepositoryByOwnerAndName(ctx context.Context, request GetRepositoryByOwnerAndNameRequestObject) (GetRepositoryByOwnerAndNameResponseObject, error)
+	// Resolve Repository Git Path
+	// (GET /v1/repositories/{owner}/{repository}/git-path/resolve)
+	ResolveRepositoryGitPath(ctx context.Context, request ResolveRepositoryGitPathRequestObject) (ResolveRepositoryGitPathResponseObject, error)
 	// Get Repository Latest Commit
 	// (GET /v1/repositories/{owner}/{repository}/latest-commit)
 	GetRepositoryLatestCommit(ctx context.Context, request GetRepositoryLatestCommitRequestObject) (GetRepositoryLatestCommitResponseObject, error)
 	// Get Repository README
 	// (GET /v1/repositories/{owner}/{repository}/readme)
 	GetRepositoryReadme(ctx context.Context, request GetRepositoryReadmeRequestObject) (GetRepositoryReadmeResponseObject, error)
+	// List Repository Refs
+	// (GET /v1/repositories/{owner}/{repository}/refs)
+	ListRepositoryRefs(ctx context.Context, request ListRepositoryRefsRequestObject) (ListRepositoryRefsResponseObject, error)
 	// Get Repository Tree
 	// (GET /v1/repositories/{owner}/{repository}/tree)
 	GetRepositoryTree(ctx context.Context, request GetRepositoryTreeRequestObject) (GetRepositoryTreeResponseObject, error)
@@ -3102,6 +3743,35 @@ func (sh *strictHandler) GetRepositoryByOwnerAndName(ctx *gin.Context, owner str
 	}
 }
 
+// ResolveRepositoryGitPath operation middleware
+func (sh *strictHandler) ResolveRepositoryGitPath(ctx *gin.Context, owner string, repository string, params ResolveRepositoryGitPathParams) {
+	var request ResolveRepositoryGitPathRequestObject
+
+	request.Owner = owner
+	request.Repository = repository
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ResolveRepositoryGitPath(ctx, request.(ResolveRepositoryGitPathRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResolveRepositoryGitPath")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(ResolveRepositoryGitPathResponseObject); ok {
+		if err := validResponse.VisitResolveRepositoryGitPathResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetRepositoryLatestCommit operation middleware
 func (sh *strictHandler) GetRepositoryLatestCommit(ctx *gin.Context, owner string, repository string, params GetRepositoryLatestCommitParams) {
 	var request GetRepositoryLatestCommitRequestObject
@@ -3153,6 +3823,35 @@ func (sh *strictHandler) GetRepositoryReadme(ctx *gin.Context, owner string, rep
 		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(GetRepositoryReadmeResponseObject); ok {
 		if err := validResponse.VisitGetRepositoryReadmeResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRepositoryRefs operation middleware
+func (sh *strictHandler) ListRepositoryRefs(ctx *gin.Context, owner string, repository string, params ListRepositoryRefsParams) {
+	var request ListRepositoryRefsRequestObject
+
+	request.Owner = owner
+	request.Repository = repository
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRepositoryRefs(ctx, request.(ListRepositoryRefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRepositoryRefs")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(ListRepositoryRefsResponseObject); ok {
+		if err := validResponse.VisitListRepositoryRefsResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {

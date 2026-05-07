@@ -4,8 +4,7 @@ import { useParams } from "next/navigation";
 import { PropsWithChildren, createContext, useContext } from "react";
 
 import { $api } from "@/lib/api";
-
-import { SchemaRepository } from "../../types/api";
+import { SchemaRepository } from "@/types/api";
 
 interface RepositoryContextValue extends SchemaRepository {}
 

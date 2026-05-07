@@ -6,6 +6,7 @@ import (
 	"os"
 	pathpkg "path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,6 +23,8 @@ var (
 	ErrReadmeNotFound = errors.New("readme not found")
 	ErrReadmeTooLarge = errors.New("readme too large")
 	ErrCommitNotFound = errors.New("commit not found")
+	ErrRefNotFound    = errors.New("ref not found")
+	ErrPathNotFound   = errors.New("path not found")
 	ErrTreeNotFound   = errors.New("tree not found")
 )
 
@@ -62,6 +65,20 @@ type LatestCommit struct {
 	CommitterName   string
 	CommitterEmail  string
 	CommittedAt     time.Time
+}
+
+type ResolvedGitPath struct {
+	Ref       string
+	CommitOID string
+	Path      string
+	PathType  string
+}
+
+type Ref struct {
+	Name      string
+	Type      string
+	CommitOID string
+	IsDefault bool
 }
 
 // Store is not a git backend, but the git orchestrator. Business logic for git operations, using the git package as the backend
@@ -211,6 +228,7 @@ func (s Store) GetTree(ctx context.Context, dbRepo db.Repository, ref string, di
 			Size: entry.Size,
 		})
 	}
+	sortTreeEntries(entries)
 
 	return Tree{
 		Ref:       ref,
@@ -257,6 +275,105 @@ func (s Store) GetLatestCommit(ctx context.Context, dbRepo db.Repository, ref st
 	}, nil
 }
 
+func (s Store) ResolveGitPath(ctx context.Context, dbRepo db.Repository, rawPath string) (ResolvedGitPath, error) {
+	rawPath = strings.TrimSpace(rawPath)
+	if rawPath == "" {
+		return ResolvedGitPath{}, ErrInvalidPath
+	}
+	if strings.ContainsAny(rawPath, "\x00\r\n") {
+		return ResolvedGitPath{}, ErrInvalidPath
+	}
+
+	normalizedPath, err := normalizeGitDirectory(rawPath)
+	if err != nil {
+		return ResolvedGitPath{}, err
+	}
+	if normalizedPath == "" {
+		return ResolvedGitPath{}, ErrInvalidPath
+	}
+
+	repoPath := s.GetRepoPath(dbRepo)
+	refs, err := s.git.ListRefs(ctx, repoPath)
+	if err != nil {
+		return ResolvedGitPath{}, err
+	}
+
+	refSet := make(map[string]struct{}, len(refs)+1)
+	for _, ref := range refs {
+		refSet[ref.Name] = struct{}{}
+	}
+	refSet[dbRepo.DefaultBranch] = struct{}{}
+
+	segments := strings.Split(normalizedPath, "/")
+	for length := len(segments); length > 0; length-- {
+		ref := pathpkg.Join(segments[:length]...)
+		if _, ok := refSet[ref]; !ok {
+			continue
+		}
+
+		commitOID, err := s.git.ResolveCommit(ctx, repoPath, ref)
+		if err != nil {
+			continue
+		}
+
+		path := ""
+		if length < len(segments) {
+			path = pathpkg.Join(segments[length:]...)
+		}
+		if path == "" {
+			return ResolvedGitPath{
+				Ref:       ref,
+				CommitOID: commitOID,
+				Path:      "",
+				PathType:  "root",
+			}, nil
+		}
+
+		entry, err := s.git.LsTreePath(ctx, repoPath, commitOID, path)
+		if err != nil {
+			return ResolvedGitPath{}, ErrPathNotFound
+		}
+		if entry == nil {
+			return ResolvedGitPath{}, ErrPathNotFound
+		}
+
+		return ResolvedGitPath{
+			Ref:       ref,
+			CommitOID: commitOID,
+			Path:      path,
+			PathType:  entry.Type,
+		}, nil
+	}
+
+	return ResolvedGitPath{}, ErrRefNotFound
+}
+
+func (s Store) ListBranchRefs(ctx context.Context, dbRepo db.Repository) ([]Ref, error) {
+	repoPath := s.GetRepoPath(dbRepo)
+	gitRefs, err := s.git.ListRefs(ctx, repoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	refs := make([]Ref, 0, len(gitRefs))
+	for _, ref := range gitRefs {
+		if !isBranchRef(ref) {
+			continue
+		}
+
+		refs = append(refs, Ref{
+			Name:      ref.Name,
+			Type:      "branch",
+			CommitOID: ref.OID,
+			IsDefault: ref.Name == dbRepo.DefaultBranch,
+		})
+	}
+
+	sortRefs(refs)
+
+	return refs, nil
+}
+
 func normalizeGitDirectory(directory string) (string, error) {
 	directory = strings.TrimSpace(strings.ReplaceAll(directory, "\\", "/"))
 	if directory == "" || directory == "." || directory == "/" {
@@ -284,6 +401,58 @@ func normalizeGitDirectory(directory string) (string, error) {
 	}
 
 	return pathpkg.Join(segments...), nil
+}
+
+func sortTreeEntries(entries []TreeEntry) {
+	sort.SliceStable(entries, func(i, j int) bool {
+		left := entries[i]
+		right := entries[j]
+
+		leftIsDirectory := isTreeDirectory(left)
+		rightIsDirectory := isTreeDirectory(right)
+		if leftIsDirectory != rightIsDirectory {
+			return leftIsDirectory
+		}
+
+		leftName := strings.ToLower(left.Name)
+		rightName := strings.ToLower(right.Name)
+		if leftName != rightName {
+			return leftName < rightName
+		}
+
+		if left.Name != right.Name {
+			return left.Name < right.Name
+		}
+
+		return left.Path < right.Path
+	})
+}
+
+func isTreeDirectory(entry TreeEntry) bool {
+	return entry.Type == "tree" || entry.Type == "commit"
+}
+
+func sortRefs(refs []Ref) {
+	sort.SliceStable(refs, func(i, j int) bool {
+		left := refs[i]
+		right := refs[j]
+
+		if left.IsDefault != right.IsDefault {
+			return left.IsDefault
+		}
+
+		leftName := strings.ToLower(left.Name)
+		rightName := strings.ToLower(right.Name)
+		if leftName != rightName {
+			return leftName < rightName
+		}
+
+		return left.Name < right.Name
+	})
+}
+
+func isBranchRef(ref git.Ref) bool {
+	return ref.Type == "commit"
 }
 
 func isSafeRef(ref string) bool {

@@ -188,6 +188,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{owner}/{repository}/git-path/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve Repository Git Path
+         * @description Resolve a GitHub-style path into a repository ref and optional path. Public repositories can be resolved without authentication.
+         */
+        get: operations["resolveRepositoryGitPath"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{owner}/{repository}/refs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Repository Refs
+         * @description List repository refs. Only branch refs are supported for now.
+         */
+        get: operations["listRepositoryRefs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories/{owner}/{repository}/tree": {
         parameters: {
             query?: never;
@@ -288,6 +328,17 @@ export interface components {
          * @enum {string}
          */
         RepositoryVisibility: "private" | "public";
+        ListRepositoryRefsResponse: {
+            refs: components["schemas"]["RepositoryRef"][];
+        };
+        RepositoryRef: {
+            name: string;
+            type: components["schemas"]["RepositoryRefType"];
+            commitOid: string;
+            isDefault: boolean;
+        };
+        /** @enum {string} */
+        RepositoryRefType: "branch";
         RepositoryReadme: {
             ref: string;
             commitOid: string;
@@ -314,6 +365,13 @@ export interface components {
             committerEmail: string;
             /** Format: date-time */
             committedAt: string;
+        };
+        ResolvedRepositoryGitPath: {
+            ref: string;
+            commitOid: string;
+            path: string;
+            /** @enum {string} */
+            pathType: "root" | "blob" | "tree" | "commit";
         };
         RepositoryTree: {
             ref: string;
@@ -409,9 +467,16 @@ export type SchemaGitAccessToken = components["schemas"]["GitAccessToken"];
 export type SchemaRepository = components["schemas"]["Repository"];
 export type SchemaRepositoryVisibility =
     components["schemas"]["RepositoryVisibility"];
+export type SchemaListRepositoryRefsResponse =
+    components["schemas"]["ListRepositoryRefsResponse"];
+export type SchemaRepositoryRef = components["schemas"]["RepositoryRef"];
+export type SchemaRepositoryRefType =
+    components["schemas"]["RepositoryRefType"];
 export type SchemaRepositoryReadme = components["schemas"]["RepositoryReadme"];
 export type SchemaRepositoryLatestCommit =
     components["schemas"]["RepositoryLatestCommit"];
+export type SchemaResolvedRepositoryGitPath =
+    components["schemas"]["ResolvedRepositoryGitPath"];
 export type SchemaRepositoryTree = components["schemas"]["RepositoryTree"];
 export type SchemaRepositoryTreeEntry =
     components["schemas"]["RepositoryTreeEntry"];
@@ -672,6 +737,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RepositoryLatestCommit"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    resolveRepositoryGitPath: {
+        parameters: {
+            query: {
+                /** @description Ambiguous path containing a ref followed by an optional repository path. */
+                path: string;
+            };
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedRepositoryGitPath"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listRepositoryRefs: {
+        parameters: {
+            query?: {
+                /** @description Ref type to list. Currently only `branch` is supported. */
+                type?: components["schemas"]["RepositoryRefType"];
+            };
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListRepositoryRefsResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];

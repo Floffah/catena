@@ -10,11 +10,24 @@ import {
 export async function RepositoryReadme({
     ownerName,
     repositoryName,
+    branch,
+    path,
 }: {
     ownerName: string;
     repositoryName: string;
+    branch?: string;
+    path?: string;
 }) {
-    const readme = await serverGetRepositoryReadme(ownerName, repositoryName);
+    const readme = await serverGetRepositoryReadme(
+        ownerName,
+        repositoryName,
+        branch,
+        path,
+    );
+
+    if (!readme) {
+        return null;
+    }
 
     return (
         <Card asChild>

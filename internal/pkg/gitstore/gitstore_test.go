@@ -69,3 +69,33 @@ func TestNormalizeGitDirectory(t *testing.T) {
 		})
 	}
 }
+
+func TestSortTreeEntries(t *testing.T) {
+	size := int64(10)
+	entries := []TreeEntry{
+		{Name: "zeta.go", Path: "zeta.go", Type: "blob", Size: &size},
+		{Name: "alpha.go", Path: "alpha.go", Type: "blob", Size: &size},
+		{Name: "vendor", Path: "vendor", Type: "commit"},
+		{Name: "Docs", Path: "Docs", Type: "tree"},
+		{Name: "app", Path: "app", Type: "tree"},
+		{Name: "README.md", Path: "README.md", Type: "blob", Size: &size},
+	}
+
+	sortTreeEntries(entries)
+
+	got := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		got = append(got, entry.Name)
+	}
+
+	want := []string{"app", "Docs", "vendor", "alpha.go", "README.md", "zeta.go"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}

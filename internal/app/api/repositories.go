@@ -278,6 +278,106 @@ func (s *Server) GetRepositoryLatestCommit(ctx context.Context, request GetRepos
 	}, nil
 }
 
+func (s *Server) ResolveRepositoryGitPath(ctx context.Context, request ResolveRepositoryGitPathRequestObject) (ResolveRepositoryGitPathResponseObject, error) {
+	repository, accessErr := s.getAccessibleRepository(ctx, request.Owner, request.Repository)
+	if accessErr != nil {
+		switch accessErr.Status {
+		case http.StatusUnauthorized:
+			return ResolveRepositoryGitPath401JSONResponse{
+				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: accessErr.Message},
+			}, nil
+		case http.StatusNotFound:
+			return ResolveRepositoryGitPath404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: accessErr.Message},
+			}, nil
+		default:
+			return ResolveRepositoryGitPath500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: accessErr.Message},
+			}, nil
+		}
+	}
+
+	resolved, err := s.git.ResolveGitPath(ctx, repository, request.Params.Path)
+	if err != nil {
+		switch {
+		case errors.Is(err, gitstore.ErrInvalidPath):
+			return ResolveRepositoryGitPath400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: err.Error()},
+			}, nil
+		case errors.Is(err, gitstore.ErrRefNotFound):
+			return ResolveRepositoryGitPath404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: "ref not found"},
+			}, nil
+		case errors.Is(err, gitstore.ErrPathNotFound):
+			return ResolveRepositoryGitPath404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: "path not found"},
+			}, nil
+		default:
+			return ResolveRepositoryGitPath500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to resolve git path"},
+			}, nil
+		}
+	}
+
+	return ResolveRepositoryGitPath200JSONResponse{
+		CommitOid: resolved.CommitOID,
+		Path:      resolved.Path,
+		PathType:  ResolvedRepositoryGitPathPathType(resolved.PathType),
+		Ref:       resolved.Ref,
+	}, nil
+}
+
+func (s *Server) ListRepositoryRefs(ctx context.Context, request ListRepositoryRefsRequestObject) (ListRepositoryRefsResponseObject, error) {
+	repository, accessErr := s.getAccessibleRepository(ctx, request.Owner, request.Repository)
+	if accessErr != nil {
+		switch accessErr.Status {
+		case http.StatusUnauthorized:
+			return ListRepositoryRefs401JSONResponse{
+				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: accessErr.Message},
+			}, nil
+		case http.StatusNotFound:
+			return ListRepositoryRefs404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: accessErr.Message},
+			}, nil
+		default:
+			return ListRepositoryRefs500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: accessErr.Message},
+			}, nil
+		}
+	}
+
+	refType := Branch
+	if request.Params.Type != nil {
+		refType = *request.Params.Type
+	}
+	if refType != Branch {
+		return ListRepositoryRefs400JSONResponse{
+			BadRequestJSONResponse: BadRequestJSONResponse{Error: "only branch refs are supported"},
+		}, nil
+	}
+
+	refs, err := s.git.ListBranchRefs(ctx, repository)
+	if err != nil {
+		return ListRepositoryRefs500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load refs"},
+		}, nil
+	}
+
+	responseRefs := make([]RepositoryRef, 0, len(refs))
+	for _, ref := range refs {
+		responseRefs = append(responseRefs, RepositoryRef{
+			CommitOid: ref.CommitOID,
+			IsDefault: ref.IsDefault,
+			Name:      ref.Name,
+			Type:      RepositoryRefType(ref.Type),
+		})
+	}
+
+	return ListRepositoryRefs200JSONResponse{
+		Refs: responseRefs,
+	}, nil
+}
+
 func (s *Server) GetRepositoryTree(ctx context.Context, request GetRepositoryTreeRequestObject) (GetRepositoryTreeResponseObject, error) {
 	repository, accessErr := s.getAccessibleRepository(ctx, request.Owner, request.Repository)
 	if accessErr != nil {

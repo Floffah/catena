@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation";
-import { PropsWithChildren } from "react";
 
+import RepositoryHomepage from "@/components/views/RepositoryHomepage";
 import { serverGetRepository } from "@/lib/server/repository";
 
-export default async function Layout({
-    children,
+export default async function Page({
     params,
-}: PropsWithChildren<{
+}: {
     params: Promise<{ authorName: string; repoName: string }>;
-}>) {
+}) {
     const { authorName, repoName } = await params;
 
     const repo = await serverGetRepository(authorName, repoName);
@@ -17,5 +16,11 @@ export default async function Layout({
         return notFound();
     }
 
-    return children;
+    return (
+        <RepositoryHomepage
+            authorName={authorName}
+            repoName={repoName}
+            branch={repo.defaultBranch}
+        />
+    );
 }

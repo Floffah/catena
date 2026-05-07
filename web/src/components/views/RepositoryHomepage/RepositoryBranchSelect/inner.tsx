@@ -1,0 +1,64 @@
+"use client";
+
+import { IconSelector } from "@tabler/icons-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+export default function RepositoryBranchSelectInner({
+    ownerName,
+    repositoryName,
+    currentRef,
+    availableBranches,
+}: {
+    ownerName: string;
+    repositoryName: string;
+    currentRef: string;
+    availableBranches?: string[];
+}) {
+    const params = useParams();
+
+    const browsePathSegments = params["path"] as string[];
+    const browsePath = browsePathSegments ? browsePathSegments.join("/") : "";
+
+    if (!availableBranches) {
+        return currentRef;
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                    {currentRef}
+                    <IconSelector className="size-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+                <DropdownMenuGroup>
+                    {availableBranches.map((branch) => {
+                        const pathBase = `/${ownerName}/${repositoryName}/browse`;
+                        let href = `${pathBase}/${branch}`;
+
+                        if (browsePath) {
+                            href = `${pathBase}/${browsePath.replace(currentRef, branch)}`;
+                        }
+
+                        return (
+                            <DropdownMenuItem asChild key={branch}>
+                                <Link href={href}>{branch}</Link>
+                            </DropdownMenuItem>
+                        );
+                    })}
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}

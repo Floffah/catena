@@ -302,6 +302,91 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}/git-path/resolve":
+    get:
+      tags:
+        - v1
+      summary: Resolve Repository Git Path
+      description: Resolve a GitHub-style path into a repository ref and optional path. Public repositories can be resolved without authentication.
+      operationId: resolveRepositoryGitPath
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: true
+          description: Ambiguous path containing a ref followed by an optional repository path.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolvedRepositoryGitPath"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}/refs":
+    get:
+      tags:
+        - v1
+      summary: List Repository Refs
+      description: List repository refs. Only branch refs are supported for now.
+      operationId: listRepositoryRefs
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          description: Ref type to list. Currently only `branch` is supported.
+          schema:
+            $ref: "#/components/schemas/RepositoryRefType"
+            default: branch
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRepositoryRefsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/repositories/{owner}/{repository}/tree":
     get:
       tags:
@@ -504,6 +589,35 @@ components:
         - private
         - public
       default: private
+    ListRepositoryRefsResponse:
+      type: object
+      required:
+        - refs
+      properties:
+        refs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryRef"
+    RepositoryRef:
+      type: object
+      required:
+        - name
+        - type
+        - commitOid
+        - isDefault
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/RepositoryRefType"
+        commitOid:
+          type: string
+        isDefault:
+          type: boolean
+    RepositoryRefType:
+      type: string
+      enum:
+        - branch
     RepositoryReadme:
       type: object
       required:
@@ -573,6 +687,27 @@ components:
         committedAt:
           type: string
           format: date-time
+    ResolvedRepositoryGitPath:
+      type: object
+      required:
+        - ref
+        - commitOid
+        - path
+        - pathType
+      properties:
+        ref:
+          type: string
+        commitOid:
+          type: string
+        path:
+          type: string
+        pathType:
+          type: string
+          enum:
+            - root
+            - blob
+            - tree
+            - commit
     RepositoryTree:
       type: object
       required:

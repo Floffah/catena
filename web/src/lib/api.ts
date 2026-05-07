@@ -2,8 +2,7 @@ import createFetchClient, { Middleware } from "openapi-fetch";
 import createQueryClient from "openapi-react-query";
 
 import { useCatenaAuth } from "@/providers/AuthProvider";
-
-import { paths } from "../../types/api";
+import { paths } from "@/types/api";
 
 let token: string | null = null;
 
