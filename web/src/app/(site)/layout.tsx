@@ -1,6 +1,6 @@
 import { PropsWithChildren } from "react";
 
-import Navbar from "@/components/blocks/Navbar";
+import Navbar from "../../components/blocks/Navbar";
 
 export default function Layout({ children }: PropsWithChildren) {
     return (

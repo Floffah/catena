@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/users/clerk/{clerkUserId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User By Clerk ID
+         * @description Retrieve the authenticated Catena user by Clerk user ID. The path Clerk user ID must match the authenticated Clerk principal.
+         */
+        get: operations["getUserByClerkUserId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/clerk/sign-in-token": {
         parameters: {
             query?: never;
@@ -419,6 +439,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Forbidden */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Internal Server Error */
         InternalServerError: {
             headers: {
@@ -483,6 +512,7 @@ export type SchemaRepositoryTreeEntry =
 export type SchemaUser = components["schemas"]["User"];
 export type ResponseBadRequest = components["responses"]["BadRequest"];
 export type ResponseConflict = components["responses"]["Conflict"];
+export type ResponseForbidden = components["responses"]["Forbidden"];
 export type ResponseInternalServerError =
     components["responses"]["InternalServerError"];
 export type ResponseNotFound = components["responses"]["NotFound"];
@@ -531,6 +561,32 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getUserByClerkUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clerkUserId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

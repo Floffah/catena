@@ -1,16 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
 import { cache } from "react";
 
-import { apiFetch, setAuthToken } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
+import { authenticateApiClient } from "@/lib/server/auth";
 import { SchemaRepositoryRefType } from "@/types/api";
 
 export const serverGetRepository = cache(
     async (owner: string, repository: string) => {
-        const { getToken, isAuthenticated } = await auth();
-
-        if (isAuthenticated) {
-            setAuthToken(await getToken());
-        }
+        await authenticateApiClient();
 
         const res = await apiFetch.GET(
             "/v1/repositories/{owner}/{repository}",
@@ -30,11 +26,7 @@ export const serverGetRepository = cache(
 
 export const serverGetRepositoryReadme = cache(
     async (owner: string, repository: string, ref = "main", path = "/") => {
-        const { getToken, isAuthenticated } = await auth();
-
-        if (isAuthenticated) {
-            setAuthToken(await getToken());
-        }
+        await authenticateApiClient();
 
         const res = await apiFetch.GET(
             "/v1/repositories/{owner}/{repository}/readme",
@@ -58,11 +50,7 @@ export const serverGetRepositoryReadme = cache(
 
 export const serverGetRepositoryTree = cache(
     async (owner: string, repository: string, ref = "main", path = "/") => {
-        const { getToken, isAuthenticated } = await auth();
-
-        if (isAuthenticated) {
-            setAuthToken(await getToken());
-        }
+        await authenticateApiClient();
 
         const res = await apiFetch.GET(
             "/v1/repositories/{owner}/{repository}/tree",
@@ -86,11 +74,7 @@ export const serverGetRepositoryTree = cache(
 
 export const serverGetRepositoryLatestCommit = cache(
     async (owner: string, repository: string, ref = "main", path = "/") => {
-        const { getToken, isAuthenticated } = await auth();
-
-        if (isAuthenticated) {
-            setAuthToken(await getToken());
-        }
+        await authenticateApiClient();
 
         const res = await apiFetch.GET(
             "/v1/repositories/{owner}/{repository}/latest-commit",
@@ -114,11 +98,7 @@ export const serverGetRepositoryLatestCommit = cache(
 
 export const serverResolveRepositoryGitPath = cache(
     async (owner: string, repository: string, path: string) => {
-        const { getToken, isAuthenticated } = await auth();
-
-        if (isAuthenticated) {
-            setAuthToken(await getToken());
-        }
+        await authenticateApiClient();
 
         const res = await apiFetch.GET(
             "/v1/repositories/{owner}/{repository}/git-path/resolve",
@@ -145,11 +125,7 @@ export const serverListRepositoryRefs = cache(
         repository: string,
         type: SchemaRepositoryRefType = "branch",
     ) => {
-        const { getToken, isAuthenticated } = await auth();
-
-        if (isAuthenticated) {
-            setAuthToken(await getToken());
-        }
+        await authenticateApiClient();
 
         const res = await apiFetch.GET(
             "/v1/repositories/{owner}/{repository}/refs",

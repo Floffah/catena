@@ -266,6 +266,9 @@ type BadRequest = Error
 // Conflict defines model for Conflict.
 type Conflict = Error
 
+// Forbidden defines model for Forbidden.
+type Forbidden = Error
+
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = Error
 
@@ -435,6 +438,9 @@ type ClientInterface interface {
 
 	// GetAuthenticatedUser request
 	GetAuthenticatedUser(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUserByClerkUserId request
+	GetUserByClerkUserId(ctx context.Context, clerkUserId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) CreateClerkSignInToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -607,6 +613,18 @@ func (c *Client) GetRepositoryTree(ctx context.Context, owner string, repository
 
 func (c *Client) GetAuthenticatedUser(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAuthenticatedUserRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetUserByClerkUserId(ctx context.Context, clerkUserId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUserByClerkUserIdRequest(c.Server, clerkUserId)
 	if err != nil {
 		return nil, err
 	}
@@ -1239,6 +1257,40 @@ func NewGetAuthenticatedUserRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetUserByClerkUserIdRequest generates requests for GetUserByClerkUserId
+func NewGetUserByClerkUserIdRequest(server string, clerkUserId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "clerkUserId", clerkUserId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/users/clerk/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1324,6 +1376,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetAuthenticatedUserWithResponse request
 	GetAuthenticatedUserWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthenticatedUserClientResponse, error)
+
+	// GetUserByClerkUserIdWithResponse request
+	GetUserByClerkUserIdWithResponse(ctx context.Context, clerkUserId string, reqEditors ...RequestEditorFn) (*GetUserByClerkUserIdClientResponse, error)
 }
 
 type CreateClerkSignInTokenClientResponse struct {
@@ -1651,6 +1706,32 @@ func (r GetAuthenticatedUserClientResponse) StatusCode() int {
 	return 0
 }
 
+type GetUserByClerkUserIdClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *User
+	JSON401      *Unauthorized
+	JSON403      *Forbidden
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUserByClerkUserIdClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUserByClerkUserIdClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // CreateClerkSignInTokenWithResponse request returning *CreateClerkSignInTokenClientResponse
 func (c *ClientWithResponses) CreateClerkSignInTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CreateClerkSignInTokenClientResponse, error) {
 	rsp, err := c.CreateClerkSignInToken(ctx, reqEditors...)
@@ -1782,6 +1863,15 @@ func (c *ClientWithResponses) GetAuthenticatedUserWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseGetAuthenticatedUserClientResponse(rsp)
+}
+
+// GetUserByClerkUserIdWithResponse request returning *GetUserByClerkUserIdClientResponse
+func (c *ClientWithResponses) GetUserByClerkUserIdWithResponse(ctx context.Context, clerkUserId string, reqEditors ...RequestEditorFn) (*GetUserByClerkUserIdClientResponse, error) {
+	rsp, err := c.GetUserByClerkUserId(ctx, clerkUserId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUserByClerkUserIdClientResponse(rsp)
 }
 
 // ParseCreateClerkSignInTokenClientResponse parses an HTTP response from a CreateClerkSignInTokenWithResponse call
@@ -2383,6 +2473,60 @@ func ParseGetAuthenticatedUserClientResponse(rsp *http.Response) (*GetAuthentica
 	return response, nil
 }
 
+// ParseGetUserByClerkUserIdClientResponse parses an HTTP response from a GetUserByClerkUserIdWithResponse call
+func ParseGetUserByClerkUserIdClientResponse(rsp *http.Response) (*GetUserByClerkUserIdClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUserByClerkUserIdClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest User
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Create Clerk Sign-In Token
@@ -2424,6 +2568,9 @@ type ServerInterface interface {
 	// Get Authenticated User
 	// (GET /v1/user)
 	GetAuthenticatedUser(c *gin.Context)
+	// Get User By Clerk ID
+	// (GET /v1/users/clerk/{clerkUserId})
+	GetUserByClerkUserId(c *gin.Context, clerkUserId string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -2845,6 +2992,32 @@ func (siw *ServerInterfaceWrapper) GetAuthenticatedUser(c *gin.Context) {
 	siw.Handler.GetAuthenticatedUser(c)
 }
 
+// GetUserByClerkUserId operation middleware
+func (siw *ServerInterfaceWrapper) GetUserByClerkUserId(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "clerkUserId" -------------
+	var clerkUserId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "clerkUserId", c.Param("clerkUserId"), &clerkUserId, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter clerkUserId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetUserByClerkUserId(c, clerkUserId)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -2885,11 +3058,14 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/refs", wrapper.ListRepositoryRefs)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/tree", wrapper.GetRepositoryTree)
 	router.GET(options.BaseURL+"/v1/user", wrapper.GetAuthenticatedUser)
+	router.GET(options.BaseURL+"/v1/users/clerk/:clerkUserId", wrapper.GetUserByClerkUserId)
 }
 
 type BadRequestJSONResponse Error
 
 type ConflictJSONResponse Error
+
+type ForbiddenJSONResponse Error
 
 type InternalServerErrorJSONResponse Error
 
@@ -3492,6 +3668,61 @@ func (response GetAuthenticatedUser500JSONResponse) VisitGetAuthenticatedUserRes
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetUserByClerkUserIdRequestObject struct {
+	ClerkUserId string `json:"clerkUserId"`
+}
+
+type GetUserByClerkUserIdResponseObject interface {
+	VisitGetUserByClerkUserIdResponse(w http.ResponseWriter) error
+}
+
+type GetUserByClerkUserId200JSONResponse User
+
+func (response GetUserByClerkUserId200JSONResponse) VisitGetUserByClerkUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetUserByClerkUserId401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetUserByClerkUserId401JSONResponse) VisitGetUserByClerkUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetUserByClerkUserId403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetUserByClerkUserId403JSONResponse) VisitGetUserByClerkUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetUserByClerkUserId404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetUserByClerkUserId404JSONResponse) VisitGetUserByClerkUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetUserByClerkUserId500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetUserByClerkUserId500JSONResponse) VisitGetUserByClerkUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Create Clerk Sign-In Token
@@ -3533,6 +3764,9 @@ type StrictServerInterface interface {
 	// Get Authenticated User
 	// (GET /v1/user)
 	GetAuthenticatedUser(ctx context.Context, request GetAuthenticatedUserRequestObject) (GetAuthenticatedUserResponseObject, error)
+	// Get User By Clerk ID
+	// (GET /v1/users/clerk/{clerkUserId})
+	GetUserByClerkUserId(ctx context.Context, request GetUserByClerkUserIdRequestObject) (GetUserByClerkUserIdResponseObject, error)
 }
 
 type StrictHandlerFunc = strictgin.StrictGinHandlerFunc
@@ -3906,6 +4140,33 @@ func (sh *strictHandler) GetAuthenticatedUser(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(GetAuthenticatedUserResponseObject); ok {
 		if err := validResponse.VisitGetAuthenticatedUserResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetUserByClerkUserId operation middleware
+func (sh *strictHandler) GetUserByClerkUserId(ctx *gin.Context, clerkUserId string) {
+	var request GetUserByClerkUserIdRequestObject
+
+	request.ClerkUserId = clerkUserId
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetUserByClerkUserId(ctx, request.(GetUserByClerkUserIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetUserByClerkUserId")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(GetUserByClerkUserIdResponseObject); ok {
+		if err := validResponse.VisitGetUserByClerkUserIdResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {

@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -39,9 +40,11 @@ export default function RootLayout({ children }: PropsWithChildren) {
                 <ThemeProvider
                     attribute="class"
                     defaultTheme="system"
+                    enableColorScheme
+                    disableTransitionOnChange
                     enableSystem
                 >
-                    <ClerkProvider>
+                    <ClerkProvider appearance={{ theme: shadcn }}>
                         <QueryClientProvider>
                             <AuthProvider>{children}</AuthProvider>
                         </QueryClientProvider>

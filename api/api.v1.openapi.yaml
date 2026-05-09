@@ -60,6 +60,34 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  "/v1/users/clerk/{clerkUserId}":
+    get:
+      tags:
+        - v1
+      summary: Get User By Clerk ID
+      description: Retrieve the authenticated Catena user by Clerk user ID. The path Clerk user ID must match the authenticated Clerk principal.
+      operationId: getUserByClerkUserId
+      parameters:
+        - name: clerkUserId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/auth/clerk/sign-in-token":
     post:
       tags:
@@ -784,6 +812,12 @@ components:
             $ref: "#/components/schemas/Error"
     Conflict:
       description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Forbidden
       content:
         application/json:
           schema:
