@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const UserContextKey = "user"
+const UserContextKey = "authUser"
 
 var (
 	ClerkPublishableKey string

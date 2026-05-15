@@ -88,6 +88,31 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  "/v1/users/name/{name}":
+    get:
+      tags:
+        - v1
+      summary: Get User By Name
+      description: Retrieve a public Catena user by username.
+      operationId: getUserByName
+      security: [ ]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/auth/clerk/sign-in-token":
     post:
       tags:

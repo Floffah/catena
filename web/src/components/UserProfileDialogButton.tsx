@@ -1,0 +1,28 @@
+"use client";
+
+import { useClerk } from "@clerk/nextjs";
+import { Slot } from "radix-ui";
+import { ComponentProps } from "react";
+
+export default function UserProfileDialogButton({
+    asChild,
+    onClick,
+    ...props
+}: ComponentProps<"button"> & { asChild?: boolean }) {
+    const { openUserProfile } = useClerk();
+
+    const Comp = asChild ? Slot.Root : "button";
+
+    return (
+        <Comp
+            onClick={(e) => {
+                onClick?.(e);
+
+                if (!e.defaultPrevented && !e.isPropagationStopped()) {
+                    openUserProfile();
+                }
+            }}
+            {...props}
+        />
+    );
+}

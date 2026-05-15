@@ -34,6 +34,9 @@ format:
 
 check: lint test
 
+readme:
+	doctoc README.md --title "## Contents" --minlevel 2 --github
+
 # -- dev --
 
 [parallel]

@@ -1,80 +1,53 @@
 "use client";
 
-import {
-    SignInButton,
-    SignOutButton,
-    UserButton,
-    UserProfile,
-    useClerk,
-} from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
-import { IconLogout, IconUser, IconUserCog } from "@tabler/icons-react";
+import { SignOutButton, useClerk } from "@clerk/nextjs";
+import { IconLogout, IconUserCog } from "@tabler/icons-react";
 import Link from "next/link";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar";
+import UserProfileDialogButton from "@/components/UserProfileDialogButton";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuGroup,
     DropdownMenuItem,
-    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SchemaUser } from "@/types/api";
 
 export default function ProfileDropdown({
-    userName,
-    avatarUrl,
+    user: { name, avatarUrl },
 }: {
-    userName: string;
-    avatarUrl?: string | null;
+    user: Partial<SchemaUser> & { name: string };
 }) {
-    const { openUserProfile } = useClerk();
-
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Avatar asChild>
-                    <button>
-                        <AvatarFallback>
-                            {userName[0].toUpperCase() ?? (
-                                <IconUser className="size-4" />
-                            )}
-                        </AvatarFallback>
-                        {avatarUrl && (
-                            <AvatarImage src={avatarUrl} alt={userName} />
-                        )}
-                    </button>
-                </Avatar>
+                <button>
+                    <UserAvatar user={{ name, avatarUrl }} />
+                </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="w-full">
                 <DropdownMenuItem asChild>
-                    <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                        <Avatar className="h-8 w-8 rounded-lg">
-                            {avatarUrl && (
-                                <AvatarImage src={avatarUrl} alt={userName} />
-                            )}
-                            <AvatarFallback className="rounded-lg">
-                                {userName[0].toUpperCase() ?? (
-                                    <IconUser className="size-4" />
-                                )}
-                            </AvatarFallback>
-                        </Avatar>
+                    <Link
+                        href={`/${name}`}
+                        className="flex items-center gap-2 px-1 py-1.5 text-left text-sm"
+                    >
+                        <UserAvatar user={{ name, avatarUrl }} />
                         <div className="grid flex-1 text-left text-sm leading-tight">
-                            <span className="truncate font-medium">
-                                {userName}
-                            </span>
+                            <span className="truncate font-medium">{name}</span>
                             <span className="truncate text-xs">Profile</span>
                         </div>
-                    </div>
+                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                     <DropdownMenuItem asChild>
-                        <button onClick={() => openUserProfile()}>
+                        <UserProfileDialogButton>
                             <IconUserCog className="size-4" />
                             Manage Account
-                        </button>
+                        </UserProfileDialogButton>
                     </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />

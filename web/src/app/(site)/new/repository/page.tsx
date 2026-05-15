@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
-import { useAppForm, useFormContext } from "@/hooks/useAppForm";
+import { useAppForm } from "@/hooks/useAppForm";
 import useUser from "@/hooks/useUser";
 import { $api } from "@/lib/api";
 

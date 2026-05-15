@@ -2,10 +2,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { Card, CardContent } from "@/components/ui/card";
-import {
-    serverGetRepository,
-    serverGetRepositoryReadme,
-} from "@/lib/server/repository";
+import { serverGetRepositoryReadme } from "@/lib/server/repository";
 
 export async function RepositoryReadme({
     ownerName,
@@ -32,7 +29,10 @@ export async function RepositoryReadme({
     return (
         <Card asChild>
             <article>
-                <CardContent className="prose prose-sm dark:prose-invert">
+                <CardContent
+                    className="prose prose-sm dark:prose-invert"
+                    asChild
+                >
                     <Markdown remarkPlugins={[remarkGfm]}>
                         {readme?.content || "No README found."}
                     </Markdown>

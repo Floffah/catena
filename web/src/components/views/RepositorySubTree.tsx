@@ -2,7 +2,6 @@ import { Suspense } from "react";
 
 import { RepositoryFileList } from "@/components/views/RepositoryHomepage/RepositoryFileList";
 import { RepositoryReadme } from "@/components/views/RepositoryHomepage/RepositoryReadme";
-import { serverGetRepositoryReadme } from "@/lib/server/repository";
 
 export default async function RepositorySubTree({
     authorName,

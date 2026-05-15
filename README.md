@@ -2,6 +2,16 @@
 
 Open source modern git server. My attempt at making a GitHub-like system. Catena is experimental for now. The goal is to build a fast, modern, self-hostable social Git platform with a great developer experience and a clean web UI.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Contents
+
+- [Roadmap](#roadmap)
+- [Goals](#goals)
+- [Deployment](#deployment)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Roadmap
 
 in rough order of priority:
@@ -135,3 +145,13 @@ In no order. Features marked with \* are differentiating features. All of these 
 - **FR-046** Provide metrics, analytics, and observability.
 - **FR-047** Provide rate limiting.
 - **FR-048** Provide error tracking.
+
+## Deployment
+
+Catena is not currently production ready.
+That said, you can do the following to get a development instance running:
+- Install Go and Bun
+- Start a postgres instance (e.g. with `docker compose -f deployments/dev.docker-compose.yml up -d db`)
+- Create a [Clerk](https://clerk.com) account and create a new applicatipn
+- Set up .env and web/.env (templates are provided) with all credentials and configuration values
+- Run `just dev` to start both the backend and next app
