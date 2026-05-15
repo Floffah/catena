@@ -76,7 +76,7 @@ func (h Handler) Handle(c *gin.Context) {
 
 	err = h.serveGitHTTP(c, repository, request.GitPath, remoteUser)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		if !c.Writer.Written() {
 			c.String(http.StatusInternalServerError, "failed to serve git repository")
 		}
@@ -147,13 +147,13 @@ func (h Handler) serveGitHTTP(c *gin.Context, repository db.Repository, gitPath 
 	reader := bufio.NewReader(stdout)
 	statusCode, err := writeCGIHeaders(c, reader)
 	if err != nil {
-		cmd.Wait()
+		_ = cmd.Wait()
 		return err
 	}
 
 	c.Status(statusCode)
 	if _, err := io.Copy(c.Writer, reader); err != nil {
-		cmd.Wait()
+		_ = cmd.Wait()
 		return fmt.Errorf("stream git-http-backend response: %w", err)
 	}
 

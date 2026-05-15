@@ -129,6 +129,8 @@ paths:
                 $ref: "#/components/schemas/CreateClerkSignInTokenResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
   "/v1/git-access-tokens":

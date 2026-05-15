@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"time"
 
 	scalargo "github.com/bdpiprava/scalar-go"
 	"github.com/floffah/catena/api"
@@ -21,14 +22,14 @@ import (
 type Server struct {
 	repository db.Queries
 	dbConn     *pgxpool.Pool
-	auth       auth.AuthService
+	auth       *auth.AuthService
 	git        gitstore.Store
 	gitAuth    gitauth.Service
 }
 
 func NewServer(
 	conn *pgxpool.Pool,
-	authService auth.AuthService,
+	authService *auth.AuthService,
 	gitService gitstore.Store,
 	corsAllowedOrigins []string,
 ) (*http.Server, error) {
@@ -68,8 +69,9 @@ func NewServer(
 	r.NoRoute(gitHandler.Handle)
 
 	s := &http.Server{
-		Handler: r,
-		Addr:    "0.0.0.0:8080",
+		Handler:           r,
+		Addr:              "0.0.0.0:8080",
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	return s, nil

@@ -12,10 +12,17 @@ import (
 )
 
 func (s *Server) CreateRepository(ctx context.Context, request CreateRepositoryRequestObject) (CreateRepositoryResponseObject, error) {
-	authUser, user, err := s.auth.EnsureUserInContext(ctx)
+	authUser, err := s.auth.GetAuthFromContext(ctx)
 	if err != nil || authUser == nil {
 		return CreateRepository401JSONResponse{
 			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
+		}, nil
+	}
+
+	user, err := s.auth.GetUserFromAuth(ctx, authUser)
+	if err != nil {
+		return CreateRepository500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
 		}, nil
 	}
 
@@ -73,7 +80,7 @@ func (s *Server) CreateRepository(ctx context.Context, request CreateRepositoryR
 		DefaultBranch: defaultBranch,
 	})
 	if err != nil {
-		tx.Rollback(ctx)
+		_ = tx.Rollback(ctx)
 
 		if db.IsUniqueViolation(err) {
 			return CreateRepository409JSONResponse{
@@ -88,7 +95,7 @@ func (s *Server) CreateRepository(ctx context.Context, request CreateRepositoryR
 
 	err = s.git.CreateRepo(repository)
 	if err != nil {
-		tx.Rollback(ctx)
+		_ = tx.Rollback(ctx)
 		return CreateRepository500JSONResponse{
 			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to create git repository"},
 		}, nil
@@ -96,7 +103,7 @@ func (s *Server) CreateRepository(ctx context.Context, request CreateRepositoryR
 
 	repoResponse, err := RepositoryToAPI(repository, user.Name)
 	if err != nil {
-		tx.Rollback(ctx)
+		_ = tx.Rollback(ctx)
 		return CreateRepository500JSONResponse{
 			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to encode repository"},
 		}, nil
@@ -109,17 +116,7 @@ func (s *Server) CreateRepository(ctx context.Context, request CreateRepositoryR
 		}, nil
 	}
 
-	response := CreateRepository201JSONResponse{
-		CreatedAt:     repoResponse.CreatedAt,
-		DefaultBranch: repoResponse.DefaultBranch,
-		Description:   repoResponse.Description,
-		Id:            repoResponse.Id,
-		Name:          repoResponse.Name,
-		OwnerId:       repoResponse.OwnerId,
-		OwnerName:     repoResponse.OwnerName,
-		UpdatedAt:     repoResponse.UpdatedAt,
-		Visibility:    repoResponse.Visibility,
-	}
+	response := CreateRepository201JSONResponse(repoResponse)
 
 	return response, nil
 }
@@ -472,7 +469,7 @@ func (s *Server) getAccessibleRepository(ctx context.Context, ownerName string, 
 		return repository, nil
 	}
 
-	authUser, err := s.auth.GetUserFromContext(ctx)
+	authUser, err := s.auth.GetAuthFromContext(ctx)
 	if err != nil || authUser == nil {
 		return db.Repository{}, &repositoryAccessError{
 			Status:  http.StatusUnauthorized,
@@ -480,7 +477,7 @@ func (s *Server) getAccessibleRepository(ctx context.Context, ownerName string, 
 		}
 	}
 
-	user, err := s.repository.GetUserByClerkUserID(ctx, authUser.ID)
+	user, err := s.auth.GetUserFromAuth(ctx, authUser)
 	if err != nil || user.ID != repository.OwnerID {
 		return db.Repository{}, &repositoryAccessError{
 			Status:  http.StatusNotFound,

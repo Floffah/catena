@@ -1438,6 +1438,7 @@ type CreateClerkSignInTokenClientResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *CreateClerkSignInTokenResponse
 	JSON401      *Unauthorized
+	JSON403      *Forbidden
 	JSON500      *InternalServerError
 }
 
@@ -1986,6 +1987,13 @@ func ParseCreateClerkSignInTokenClientResponse(rsp *http.Response) (*CreateClerk
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -3247,6 +3255,15 @@ type CreateClerkSignInToken401JSONResponse struct{ UnauthorizedJSONResponse }
 func (response CreateClerkSignInToken401JSONResponse) VisitCreateClerkSignInTokenResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateClerkSignInToken403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateClerkSignInToken403JSONResponse) VisitCreateClerkSignInTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }

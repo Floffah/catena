@@ -102,7 +102,7 @@ func NewStoreFromEnv(env environment.Environment) Store {
 func (s Store) CreateRepo(dbRepo db.Repository) error {
 	repoPath := s.GetRepoPath(dbRepo)
 
-	err := os.MkdirAll(filepath.Dir(repoPath), 0755)
+	err := os.MkdirAll(filepath.Dir(repoPath), 0750)
 	if err != nil {
 		return err
 	}

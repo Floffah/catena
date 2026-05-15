@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const UserContextKey = "authUser"
+const AuthContextKey = "authUser"
 
 var (
 	ClerkPublishableKey string
@@ -30,14 +30,14 @@ type AuthService struct {
 	ClerkSignInToken *signintoken.Client
 }
 
-func NewAuthService(clerkSecretKey string, conn db.DBTX) AuthService {
+func NewAuthService(clerkSecretKey string, conn db.DBTX) *AuthService {
 	clerkConf := &clerk.ClientConfig{}
 	clerkConf.Key = &clerkSecretKey
 	clerkJwks := jwks.NewClient(clerkConf)
 	clerkUser := user.NewClient(clerkConf)
 	clerkSIT := signintoken.NewClient(clerkConf)
 
-	return AuthService{
+	return &AuthService{
 		repository:       *db.New(conn),
 		ClerkJwks:        clerkJwks,
 		ClerkUser:        clerkUser,
@@ -45,16 +45,16 @@ func NewAuthService(clerkSecretKey string, conn db.DBTX) AuthService {
 	}
 }
 
-func (s *AuthService) GetUserFromContext(ctx context.Context) (*clerk.User, error) {
+func (s *AuthService) GetAuthFromContext(ctx context.Context) (*clerk.User, error) {
 	ginCtx, okCtx := ctx.(*gin.Context)
 	if okCtx {
-		cachedUser, exists := ginCtx.Get(UserContextKey)
+		cachedUser, exists := ginCtx.Get(AuthContextKey)
 		if exists {
 			if authuser, ok := cachedUser.(*clerk.User); ok {
 				return authuser, nil
 			}
 
-			return nil, fmt.Errorf("cached user in context is not of type *clerk.User")
+			return nil, fmt.Errorf("cached auth in context is not of type *clerk.User")
 		}
 
 		auth := ginCtx.GetHeader("Authorization")
@@ -85,21 +85,17 @@ func (s *AuthService) GetUserFromContext(ctx context.Context) (*clerk.User, erro
 	return nil, nil
 }
 
-func (s *AuthService) EnsureUserInContext(ctx context.Context) (*clerk.User, db.User, error) {
-	authUser, err := s.GetUserFromContext(ctx)
-	if err != nil {
-		return nil, db.User{}, err
-	}
+func (s *AuthService) GetUserFromAuth(ctx context.Context, authUser *clerk.User) (db.User, error) {
 	if authUser == nil {
-		return nil, db.User{}, nil
+		return db.User{}, nil
 	}
 
 	dbuser, err := s.repository.GetUserByClerkUserID(ctx, authUser.ID)
 	if err == nil {
-		return authUser, dbuser, nil
+		return dbuser, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, db.User{}, err
+		return db.User{}, err
 	}
 
 	name := authUser.ID
@@ -134,29 +130,31 @@ func (s *AuthService) EnsureUserInContext(ctx context.Context) (*clerk.User, db.
 	})
 
 	if err != nil {
-		return nil, db.User{}, err
+		return db.User{}, err
 	}
 
-	return authUser, newUser, nil
+	return newUser, nil
 }
 
 func (s *AuthService) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authuser, err := s.GetUserFromContext(c)
+		authuser, err := s.GetAuthFromContext(c)
 		if err != nil {
 			c.AbortWithStatus(401)
 			return
 		}
 
-		c.Set(UserContextKey, authuser)
+		if authuser != nil {
+			c.Set(AuthContextKey, authuser)
+		}
 		c.Next()
 	}
 }
 
-func (s *AuthService) CreateClerkSignInToken(user db.User) (string, error) {
+func (s *AuthService) CreateClerkSignInToken(authUser *clerk.User) (string, error) {
 	expiresInSeconds := int64(20)
 	signInToken, err := s.ClerkSignInToken.Create(context.Background(), &signintoken.CreateParams{
-		UserID:           &user.ClerkUserID,
+		UserID:           &authUser.ID,
 		ExpiresInSeconds: &expiresInSeconds,
 	})
 	if err != nil {

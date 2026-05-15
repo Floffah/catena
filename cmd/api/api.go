@@ -32,7 +32,7 @@ func main() {
 
 	authService := auth.NewAuthService(env.Config.ClerkSecretKey, conn)
 
-	gitService := gitstore.NewStoreFromEnv(*env)
+	gitService := gitstore.NewStoreFromEnv(env)
 
 	server, err := api.NewServer(conn, authService, gitService, env.Config.CORSAllowedOrigins)
 	if err != nil {

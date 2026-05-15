@@ -11,7 +11,19 @@ import (
 )
 
 func (s *Server) ListGitAccessTokens(ctx context.Context, request ListGitAccessTokensRequestObject) (ListGitAccessTokensResponseObject, error) {
-	_, user, err := s.auth.EnsureUserInContext(ctx)
+	authUser, err := s.auth.GetAuthFromContext(ctx)
+	if err != nil {
+		return ListGitAccessTokens500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load auth user"},
+		}, nil
+	}
+	if authUser == nil {
+		return ListGitAccessTokens401JSONResponse{
+			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
+		}, nil
+	}
+
+	user, err := s.auth.GetUserFromAuth(ctx, authUser)
 	if err != nil {
 		return ListGitAccessTokens500JSONResponse{
 			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
@@ -45,7 +57,19 @@ func (s *Server) ListGitAccessTokens(ctx context.Context, request ListGitAccessT
 }
 
 func (s *Server) CreateGitAccessToken(ctx context.Context, request CreateGitAccessTokenRequestObject) (CreateGitAccessTokenResponseObject, error) {
-	_, user, err := s.auth.EnsureUserInContext(ctx)
+	authUser, err := s.auth.GetAuthFromContext(ctx)
+	if err != nil {
+		return CreateGitAccessToken500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load auth user"},
+		}, nil
+	}
+	if authUser == nil {
+		return CreateGitAccessToken401JSONResponse{
+			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
+		}, nil
+	}
+
+	user, err := s.auth.GetUserFromAuth(ctx, authUser)
 	if err != nil {
 		return CreateGitAccessToken500JSONResponse{
 			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
@@ -114,7 +138,19 @@ func (s *Server) CreateGitAccessToken(ctx context.Context, request CreateGitAcce
 }
 
 func (s *Server) RevokeGitAccessToken(ctx context.Context, request RevokeGitAccessTokenRequestObject) (RevokeGitAccessTokenResponseObject, error) {
-	_, user, err := s.auth.EnsureUserInContext(ctx)
+	authUser, err := s.auth.GetAuthFromContext(ctx)
+	if err != nil {
+		return RevokeGitAccessToken500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load auth user"},
+		}, nil
+	}
+	if authUser == nil {
+		return RevokeGitAccessToken401JSONResponse{
+			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
+		}, nil
+	}
+
+	user, err := s.auth.GetUserFromAuth(ctx, authUser)
 	if err != nil {
 		return RevokeGitAccessToken500JSONResponse{
 			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},

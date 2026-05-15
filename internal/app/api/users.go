@@ -9,14 +9,27 @@ import (
 )
 
 func (s *Server) GetAuthenticatedUser(ctx context.Context, request GetAuthenticatedUserRequestObject) (GetAuthenticatedUserResponseObject, error) {
-	_, user, err := s.auth.EnsureUserInContext(ctx)
+	authUser, err := s.auth.GetAuthFromContext(ctx)
+	if err != nil {
+		return GetAuthenticatedUser500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load auth user"},
+		}, nil
+	}
+
+	if authUser == nil {
+		return GetAuthenticatedUser401JSONResponse{
+			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
+		}, nil
+	}
+
+	user, err := s.auth.GetUserFromAuth(ctx, authUser)
 	if err != nil {
 		return GetAuthenticatedUser500JSONResponse{
 			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
 		}, nil
 	}
 
-	if user.ID.Valid == false {
+	if !user.ID.Valid {
 		return GetAuthenticatedUser401JSONResponse{
 			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
 		}, nil
@@ -33,14 +46,14 @@ func (s *Server) GetAuthenticatedUser(ctx context.Context, request GetAuthentica
 }
 
 func (s *Server) GetUserByClerkUserId(ctx context.Context, request GetUserByClerkUserIdRequestObject) (GetUserByClerkUserIdResponseObject, error) {
-	authUser, user, err := s.auth.EnsureUserInContext(ctx)
+	authUser, err := s.auth.GetAuthFromContext(ctx)
 	if err != nil {
 		return GetUserByClerkUserId500JSONResponse{
-			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load auth user"},
 		}, nil
 	}
 
-	if authUser == nil || user.ID.Valid == false {
+	if authUser == nil {
 		return GetUserByClerkUserId401JSONResponse{
 			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
 		}, nil
@@ -49,6 +62,19 @@ func (s *Server) GetUserByClerkUserId(ctx context.Context, request GetUserByCler
 	if authUser.ID != request.ClerkUserId {
 		return GetUserByClerkUserId403JSONResponse{
 			ForbiddenJSONResponse: ForbiddenJSONResponse{Error: "forbidden"},
+		}, nil
+	}
+
+	user, err := s.auth.GetUserFromAuth(ctx, authUser)
+	if err != nil {
+		return GetUserByClerkUserId500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
+		}, nil
+	}
+
+	if !user.ID.Valid {
+		return GetUserByClerkUserId401JSONResponse{
+			UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: "unauthorized"},
 		}, nil
 	}
 

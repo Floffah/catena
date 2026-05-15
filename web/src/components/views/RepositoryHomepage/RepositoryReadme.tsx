@@ -29,10 +29,7 @@ export async function RepositoryReadme({
     return (
         <Card asChild>
             <article>
-                <CardContent
-                    className="prose prose-sm dark:prose-invert"
-                    asChild
-                >
+                <CardContent className="prose prose-sm dark:prose-invert">
                     <Markdown remarkPlugins={[remarkGfm]}>
                         {readme?.content || "No README found."}
                     </Markdown>

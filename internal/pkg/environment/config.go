@@ -10,11 +10,11 @@ type Config struct {
 	CatenaGitRoot      string   `env:"CATENA_GIT_ROOT" envDefault:"/var/lib/catena/git"`
 }
 
-func LoadConfig() (*Config, error) {
-	cfg := &Config{}
-	err := env.Parse(cfg)
+func LoadConfig() (Config, error) {
+	var cfg Config
+	err := env.Parse(&cfg)
 	if err != nil {
-		return nil, err
+		return Config{}, err
 	}
 	return cfg, nil
 }

@@ -37,6 +37,14 @@ check: lint test
 readme:
 	doctoc README.md --title "## Contents" --minlevel 2 --github
 
+security-local:
+	golangci-lint run -E gosec
+	go tool nuclei -code -u http://localhost:8080
+
+security-remote:
+	golangci-lint run -E gosec
+	go tool nuclei -code -u https://oncatena.com
+
 # -- dev --
 
 [parallel]
