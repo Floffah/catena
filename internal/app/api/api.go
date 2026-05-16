@@ -32,6 +32,7 @@ func NewServer(
 	authService *auth.AuthService,
 	gitService gitstore.Store,
 	corsAllowedOrigins []string,
+	port string,
 ) (*http.Server, error) {
 	gitAuthService := gitauth.NewService(conn)
 	server := Server{
@@ -70,7 +71,7 @@ func NewServer(
 
 	s := &http.Server{
 		Handler:           r,
-		Addr:              "0.0.0.0:8080",
+		Addr:              "0.0.0.0:" + port,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

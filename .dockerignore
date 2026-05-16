@@ -1,0 +1,10 @@
+.catena
+.env
+.git
+.idea
+.next
+build
+coverage.out
+node_modules
+web/.next
+web/node_modules

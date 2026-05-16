@@ -34,7 +34,7 @@ func main() {
 
 	gitService := gitstore.NewStoreFromEnv(env)
 
-	server, err := api.NewServer(conn, authService, gitService, env.Config.CORSAllowedOrigins)
+	server, err := api.NewServer(conn, authService, gitService, env.Config.CORSAllowedOrigins, env.Config.Port)
 	if err != nil {
 		log.Fatal(err)
 	}

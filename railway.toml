@@ -1,0 +1,9 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "deployments/api.Dockerfile"
+
+[deploy]
+healthcheckPath = "/v1/healthz"
+healthcheckTimeout = 100
+restartPolicyType = "ALWAYS"
+preDeployCommand = "tern migrate --migrations /app/data/migrations"
