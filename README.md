@@ -2,6 +2,10 @@
 
 Open source modern git server. My attempt at making a GitHub-like system. Catena is experimental for now. The goal is to build a fast, modern, self-hostable social Git platform with a great developer experience and a clean web UI.
 
+Links:
+- [Production Instance](https://www.oncatena.com)
+- [API Docs](https://api.oncatena.com/docs)
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Contents

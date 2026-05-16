@@ -30,14 +30,16 @@ export default async function RepositoryAside({
             </section>
 
             <section className="flex flex-col gap-1">
-                <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <IconClock className="size-5" />
-                    Last updated{" "}
-                    {formatRelative(
-                        new Date(latestCommit?.authoredAt ?? ""),
-                        new Date(),
-                    )}
-                </p>
+                {latestCommit && (
+                    <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <IconClock className="size-5" />
+                        Last updated{" "}
+                        {formatRelative(
+                            new Date(latestCommit.authoredAt ?? ""),
+                            new Date(),
+                        )}
+                    </p>
+                )}
             </section>
         </aside>
     );
