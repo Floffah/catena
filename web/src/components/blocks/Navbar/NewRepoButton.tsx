@@ -11,7 +11,7 @@ export default async function NewRepoButton() {
     if (!isAuthenticated) {
         return (
             <SignInButton>
-                <Button asChild variant="secondary">
+                <Button variant="secondary">
                     <IconPlus />
                     New Repository
                 </Button>
