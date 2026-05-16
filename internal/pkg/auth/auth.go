@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/clerk/clerk-sdk-go/v2"
+	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
 	"github.com/clerk/clerk-sdk-go/v2/jwks"
-	"github.com/clerk/clerk-sdk-go/v2/jwt"
 	"github.com/clerk/clerk-sdk-go/v2/signintoken"
 	"github.com/clerk/clerk-sdk-go/v2/user"
 	"github.com/floffah/catena/internal/pkg/db"
@@ -53,32 +54,16 @@ func (s *AuthService) GetAuthFromContext(ctx context.Context) (*Auth, error) {
 	ginCtx, okCtx := ctx.(*gin.Context)
 	if okCtx {
 		cachedAuth, exists := ginCtx.Get(AuthContextKey)
-		if exists {
-			if auth, ok := cachedAuth.(*Auth); ok {
-				return auth, nil
-			}
+		if !exists {
+			return nil, nil
+		}
 
+		auth, ok := cachedAuth.(*Auth)
+		if !ok {
 			return nil, fmt.Errorf("cached auth in context is not of type *auth.Auth")
 		}
 
-		auth := ginCtx.GetHeader("Authorization")
-
-		var token string
-		if len(auth) > 7 && auth[:7] == "Bearer " {
-			token = auth[7:]
-		}
-
-		if token != "" {
-			claims, err := jwt.Verify(ctx, &jwt.VerifyParams{
-				Token:      token,
-				JWKSClient: s.ClerkJwks,
-			})
-			if err != nil {
-				return nil, err
-			}
-
-			return &Auth{ClerkUserID: claims.Subject}, nil
-		}
+		return auth, nil
 	}
 
 	return nil, nil
@@ -141,17 +126,42 @@ func (s *AuthService) GetUserFromAuth(ctx context.Context, auth *Auth) (db.User,
 }
 
 func (s *AuthService) Middleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		auth, err := s.GetAuthFromContext(c)
-		if err != nil {
-			c.AbortWithStatus(401)
-			return
-		}
+	clerkMiddleware := clerkhttp.WithHeaderAuthorization(
+		clerkhttp.JWKSClient(s.ClerkJwks),
+		clerkhttp.AuthorizationJWTExtractor(func(r *http.Request) string {
+			header := strings.TrimSpace(r.Header.Get("Authorization"))
+			if !strings.HasPrefix(header, "Bearer ") {
+				return ""
+			}
 
-		if auth != nil {
-			c.Set(AuthContextKey, auth)
+			return strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
+		}),
+	)
+
+	return func(c *gin.Context) {
+		hasBearerAuth := strings.HasPrefix(strings.TrimSpace(c.GetHeader("Authorization")), "Bearer ")
+		nextCalled := false
+
+		clerkMiddleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			nextCalled = true
+			c.Request = r
+
+			claims, ok := clerk.SessionClaimsFromContext(r.Context())
+			if hasBearerAuth && (!ok || claims == nil) {
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+
+			if ok && claims != nil {
+				c.Set(AuthContextKey, &Auth{ClerkUserID: claims.Subject})
+			}
+
+			c.Next()
+		})).ServeHTTP(c.Writer, c.Request)
+
+		if !nextCalled {
+			c.Abort()
 		}
-		c.Next()
 	}
 }
 
