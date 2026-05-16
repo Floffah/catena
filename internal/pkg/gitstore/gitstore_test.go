@@ -1,6 +1,10 @@
 package gitstore
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/zeebo/assert"
+)
 
 func TestNormalizeGitDirectory(t *testing.T) {
 	tests := []struct {
@@ -55,17 +59,11 @@ func TestNormalizeGitDirectory(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := normalizeGitDirectory(tt.directory)
 			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error")
-				}
+				assert.NotNil(t, err)
 				return
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Fatalf("got %q, want %q", got, tt.want)
-			}
+			assert.Nil(t, err)
+			assert.That(t, got == tt.want)
 		})
 	}
 }
@@ -89,13 +87,9 @@ func TestSortTreeEntries(t *testing.T) {
 	}
 
 	want := []string{"app", "Docs", "vendor", "alpha.go", "README.md", "zeta.go"}
-	if len(got) != len(want) {
-		t.Fatalf("got %v, want %v", got, want)
-	}
+	assert.That(t, len(got) == len(want))
 
 	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("got %v, want %v", got, want)
-		}
+		assert.That(t, got[i] == want[i])
 	}
 }

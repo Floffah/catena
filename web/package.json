@@ -6,8 +6,10 @@
         "dev": "bun --bun next dev",
         "build": "next build",
         "start": "next start",
-        "lint": "eslint",
-        "generate": "bunx openapi-typescript ../api/api.v1.openapi.yaml --output types/api.d.ts --root-types --properties-required-by-default=false --default-non-nullable=false && eslint --fix types/api.d.ts"
+        "lint": "eslint src",
+        "lint:report": "eslint --output-file eslint_report.json --format json src",
+        "generate": "bunx openapi-typescript ../api/api.v1.openapi.yaml --output types/api.d.ts --root-types --properties-required-by-default=false --default-non-nullable=false && eslint --fix types/api.d.ts",
+        "format": "prettier --write src"
     },
     "dependencies": {
         "@clerk/nextjs": "^7.3.3",

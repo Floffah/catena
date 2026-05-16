@@ -148,10 +148,4 @@ In no order. Features marked with \* are differentiating features. All of these 
 
 ## Deployment
 
-Catena is not currently production ready.
-That said, you can do the following to get a development instance running:
-- Install Go and Bun
-- Start a postgres instance (e.g. with `docker compose -f deployments/dev.docker-compose.yml up -d db`)
-- Create a [Clerk](https://clerk.com) account and create a new applicatipn
-- Set up .env and web/.env (templates are provided) with all credentials and configuration values
-- Run `just dev` to start both the backend and next app
+Catena is not currently production ready. See [CONTRIBUTING.md](CONTRIBUTING.md) if you're interested in contributing or running a development instance.

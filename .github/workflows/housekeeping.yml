@@ -1,0 +1,58 @@
+name: Housekeeping
+on: [push]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: extractions/setup-just@v3
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+      - name: Install dependencies
+        run: go get ./... && bun ci
+      - name: Write env files
+        run: |
+          touch .env
+          
+          echo CLERK_PUBLISHABLE_KEY=pk_test_1234567890 >> .env
+          echo CLERK_FRONTEND_API_URL=https://something-something-xx.clerk.accounts.dev >> .env
+        shell: bash
+      - name: Build
+        run: just build
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12
+      - name: Save ESLint report
+        run: bun run lint:report
+        working-directory: ./web
+        continue-on-error: true
+      - name: Annotate ESLint results
+        uses: ataylorme/eslint-annotate-action@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          neutral-on-warning: true
+          only-pr-files: true
+          report-json: ./web/eslint_report.json
+        continue-on-error: true
+      - run: go test --json ./... > test.json
+      - name: Annotate tests
+        if: always()
+        uses: guyarb/golang-test-annotations@v0.5.1
+        with:
+          test-results: test.json
+          package-name: github.com/floffah/catena
+      - run: bun test

@@ -24,6 +24,7 @@ generate:
 
 lint:
 	golangci-lint run
+	cd web && bun run lint
 
 test:
 	go test -v -coverprofile=coverage.out ./...
@@ -31,6 +32,7 @@ test:
 format:
 	go fmt ./...
 	golangci-lint fmt
+	cd web && bun run format
 
 check: lint test
 
