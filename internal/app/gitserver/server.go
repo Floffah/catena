@@ -147,14 +147,14 @@ func (h Handler) serveGitHTTP(c *gin.Context, repository db.Repository, gitPath 
 	reader := bufio.NewReader(stdout)
 	statusCode, err := writeCGIHeaders(c, reader)
 	if err != nil {
-		_ = cmd.Wait()
-		return err
+		waitErr := cmd.Wait()
+		return gitHTTPBackendError("read git-http-backend headers", err, waitErr, stderr.String())
 	}
 
 	c.Status(statusCode)
 	if _, err := io.Copy(c.Writer, reader); err != nil {
-		_ = cmd.Wait()
-		return fmt.Errorf("stream git-http-backend response: %w", err)
+		waitErr := cmd.Wait()
+		return gitHTTPBackendError("stream git-http-backend response", err, waitErr, stderr.String())
 	}
 
 	if err := cmd.Wait(); err != nil {
@@ -167,6 +167,22 @@ func (h Handler) serveGitHTTP(c *gin.Context, repository db.Repository, gitPath 
 	}
 
 	return nil
+}
+
+func gitHTTPBackendError(operation string, err error, waitErr error, stderr string) error {
+	stderrText := strings.TrimSpace(stderr)
+	if stderrText != "" {
+		if waitErr != nil {
+			return fmt.Errorf("%s: %w: %v: %s", operation, err, waitErr, stderrText)
+		}
+
+		return fmt.Errorf("%s: %w: %s", operation, err, stderrText)
+	}
+	if waitErr != nil {
+		return fmt.Errorf("%s: %w: %v", operation, err, waitErr)
+	}
+
+	return fmt.Errorf("%s: %w", operation, err)
 }
 
 type requestPath struct {
