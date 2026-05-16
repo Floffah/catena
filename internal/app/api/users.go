@@ -59,7 +59,7 @@ func (s *Server) GetUserByClerkUserId(ctx context.Context, request GetUserByCler
 		}, nil
 	}
 
-	if authUser.ID != request.ClerkUserId {
+	if authUser.ClerkUserID != request.ClerkUserId {
 		return GetUserByClerkUserId403JSONResponse{
 			ForbiddenJSONResponse: ForbiddenJSONResponse{Error: "forbidden"},
 		}, nil

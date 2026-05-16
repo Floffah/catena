@@ -30,6 +30,10 @@ type AuthService struct {
 	ClerkSignInToken *signintoken.Client
 }
 
+type Auth struct {
+	ClerkUserID string
+}
+
 func NewAuthService(clerkSecretKey string, conn db.DBTX) *AuthService {
 	clerkConf := &clerk.ClientConfig{}
 	clerkConf.Key = &clerkSecretKey
@@ -45,16 +49,16 @@ func NewAuthService(clerkSecretKey string, conn db.DBTX) *AuthService {
 	}
 }
 
-func (s *AuthService) GetAuthFromContext(ctx context.Context) (*clerk.User, error) {
+func (s *AuthService) GetAuthFromContext(ctx context.Context) (*Auth, error) {
 	ginCtx, okCtx := ctx.(*gin.Context)
 	if okCtx {
-		cachedUser, exists := ginCtx.Get(AuthContextKey)
+		cachedAuth, exists := ginCtx.Get(AuthContextKey)
 		if exists {
-			if authuser, ok := cachedUser.(*clerk.User); ok {
-				return authuser, nil
+			if auth, ok := cachedAuth.(*Auth); ok {
+				return auth, nil
 			}
 
-			return nil, fmt.Errorf("cached auth in context is not of type *clerk.User")
+			return nil, fmt.Errorf("cached auth in context is not of type *auth.Auth")
 		}
 
 		auth := ginCtx.GetHeader("Authorization")
@@ -73,28 +77,28 @@ func (s *AuthService) GetAuthFromContext(ctx context.Context) (*clerk.User, erro
 				return nil, err
 			}
 
-			authuser, err := s.ClerkUser.Get(ctx, claims.Subject)
-			if err != nil {
-				return nil, err
-			}
-
-			return authuser, nil
+			return &Auth{ClerkUserID: claims.Subject}, nil
 		}
 	}
 
 	return nil, nil
 }
 
-func (s *AuthService) GetUserFromAuth(ctx context.Context, authUser *clerk.User) (db.User, error) {
-	if authUser == nil {
+func (s *AuthService) GetUserFromAuth(ctx context.Context, auth *Auth) (db.User, error) {
+	if auth == nil {
 		return db.User{}, nil
 	}
 
-	dbuser, err := s.repository.GetUserByClerkUserID(ctx, authUser.ID)
+	dbuser, err := s.repository.GetUserByClerkUserID(ctx, auth.ClerkUserID)
 	if err == nil {
 		return dbuser, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
+		return db.User{}, err
+	}
+
+	authUser, err := s.ClerkUser.Get(ctx, auth.ClerkUserID)
+	if err != nil {
 		return db.User{}, err
 	}
 
@@ -138,23 +142,23 @@ func (s *AuthService) GetUserFromAuth(ctx context.Context, authUser *clerk.User)
 
 func (s *AuthService) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authuser, err := s.GetAuthFromContext(c)
+		auth, err := s.GetAuthFromContext(c)
 		if err != nil {
 			c.AbortWithStatus(401)
 			return
 		}
 
-		if authuser != nil {
-			c.Set(AuthContextKey, authuser)
+		if auth != nil {
+			c.Set(AuthContextKey, auth)
 		}
 		c.Next()
 	}
 }
 
-func (s *AuthService) CreateClerkSignInToken(authUser *clerk.User) (string, error) {
+func (s *AuthService) CreateClerkSignInToken(auth *Auth) (string, error) {
 	expiresInSeconds := int64(20)
 	signInToken, err := s.ClerkSignInToken.Create(context.Background(), &signintoken.CreateParams{
-		UserID:           &authUser.ID,
+		UserID:           &auth.ClerkUserID,
 		ExpiresInSeconds: &expiresInSeconds,
 	})
 	if err != nil {

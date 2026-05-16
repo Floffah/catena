@@ -5,6 +5,7 @@ Open source modern git server. My attempt at making a GitHub-like system. Catena
 Links:
 - [Production Instance](https://www.oncatena.com)
 - [API Docs](https://api.oncatena.com/docs)
+- [Catena mirror on Catena](https://www.oncatena.com/floffah/catena)
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
