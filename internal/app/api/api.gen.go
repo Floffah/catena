@@ -260,6 +260,12 @@ type User struct {
 	UpdatedAt   time.Time          `json:"updatedAt"`
 }
 
+// Version defines model for Version.
+type Version struct {
+	Commit  string `json:"commit"`
+	Version string `json:"version"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
 
@@ -444,6 +450,9 @@ type ClientInterface interface {
 
 	// GetUserByName request
 	GetUserByName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Version request
+	Version(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) CreateClerkSignInToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -640,6 +649,18 @@ func (c *Client) GetUserByClerkUserId(ctx context.Context, clerkUserId string, r
 
 func (c *Client) GetUserByName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetUserByNameRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) Version(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVersionRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1340,6 +1361,33 @@ func NewGetUserByNameRequest(server string, name string) (*http.Request, error) 
 	return req, nil
 }
 
+// NewVersionRequest generates requests for Version
+func NewVersionRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/version")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1431,6 +1479,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetUserByNameWithResponse request
 	GetUserByNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetUserByNameClientResponse, error)
+
+	// VersionWithResponse request
+	VersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*VersionClientResponse, error)
 }
 
 type CreateClerkSignInTokenClientResponse struct {
@@ -1809,6 +1860,28 @@ func (r GetUserByNameClientResponse) StatusCode() int {
 	return 0
 }
 
+type VersionClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Version
+}
+
+// Status returns HTTPResponse.Status
+func (r VersionClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r VersionClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // CreateClerkSignInTokenWithResponse request returning *CreateClerkSignInTokenClientResponse
 func (c *ClientWithResponses) CreateClerkSignInTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CreateClerkSignInTokenClientResponse, error) {
 	rsp, err := c.CreateClerkSignInToken(ctx, reqEditors...)
@@ -1958,6 +2031,15 @@ func (c *ClientWithResponses) GetUserByNameWithResponse(ctx context.Context, nam
 		return nil, err
 	}
 	return ParseGetUserByNameClientResponse(rsp)
+}
+
+// VersionWithResponse request returning *VersionClientResponse
+func (c *ClientWithResponses) VersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*VersionClientResponse, error) {
+	rsp, err := c.Version(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVersionClientResponse(rsp)
 }
 
 // ParseCreateClerkSignInTokenClientResponse parses an HTTP response from a CreateClerkSignInTokenWithResponse call
@@ -2660,6 +2742,32 @@ func ParseGetUserByNameClientResponse(rsp *http.Response) (*GetUserByNameClientR
 	return response, nil
 }
 
+// ParseVersionClientResponse parses an HTTP response from a VersionWithResponse call
+func ParseVersionClientResponse(rsp *http.Response) (*VersionClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &VersionClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Version
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Create Clerk Sign-In Token
@@ -2707,6 +2815,9 @@ type ServerInterface interface {
 	// Get User By Name
 	// (GET /v1/users/name/{name})
 	GetUserByName(c *gin.Context, name string)
+	// Version
+	// (GET /v1/version)
+	Version(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -3178,6 +3289,19 @@ func (siw *ServerInterfaceWrapper) GetUserByName(c *gin.Context) {
 	siw.Handler.GetUserByName(c, name)
 }
 
+// Version operation middleware
+func (siw *ServerInterfaceWrapper) Version(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.Version(c)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -3220,6 +3344,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/v1/user", wrapper.GetAuthenticatedUser)
 	router.GET(options.BaseURL+"/v1/users/clerk/:clerkUserId", wrapper.GetUserByClerkUserId)
 	router.GET(options.BaseURL+"/v1/users/name/:name", wrapper.GetUserByName)
+	router.GET(options.BaseURL+"/v1/version", wrapper.Version)
 }
 
 type BadRequestJSONResponse Error
@@ -3930,6 +4055,22 @@ func (response GetUserByName500JSONResponse) VisitGetUserByNameResponse(w http.R
 	return json.NewEncoder(w).Encode(response)
 }
 
+type VersionRequestObject struct {
+}
+
+type VersionResponseObject interface {
+	VisitVersionResponse(w http.ResponseWriter) error
+}
+
+type Version200JSONResponse Version
+
+func (response Version200JSONResponse) VisitVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Create Clerk Sign-In Token
@@ -3977,6 +4118,9 @@ type StrictServerInterface interface {
 	// Get User By Name
 	// (GET /v1/users/name/{name})
 	GetUserByName(ctx context.Context, request GetUserByNameRequestObject) (GetUserByNameResponseObject, error)
+	// Version
+	// (GET /v1/version)
+	Version(ctx context.Context, request VersionRequestObject) (VersionResponseObject, error)
 }
 
 type StrictHandlerFunc = strictgin.StrictGinHandlerFunc
@@ -4404,6 +4548,31 @@ func (sh *strictHandler) GetUserByName(ctx *gin.Context, name string) {
 		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(GetUserByNameResponseObject); ok {
 		if err := validResponse.VisitGetUserByNameResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Version operation middleware
+func (sh *strictHandler) Version(ctx *gin.Context) {
+	var request VersionRequestObject
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.Version(ctx, request.(VersionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Version")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(VersionResponseObject); ok {
+		if err := validResponse.VisitVersionResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {

@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version
+         * @description Retrieve the deployed Catena version and build commit.
+         */
+        get: operations["version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/user": {
         parameters: {
             query?: never;
@@ -292,6 +312,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Version: {
+            /** @example 0.0.1 */
+            version: string;
+            /** @example d0beb8f5c55b36df7d674d55965a23b8d54ad69b */
+            commit: string;
+        };
         CreateClerkSignInTokenResponse: {
             token: string;
         };
@@ -501,6 +527,7 @@ export interface components {
     headers: never;
     pathItems: never;
 }
+export type SchemaVersion = components["schemas"]["Version"];
 export type SchemaCreateClerkSignInTokenResponse =
     components["schemas"]["CreateClerkSignInTokenResponse"];
 export type SchemaCreateGitAccessTokenRequest =
@@ -558,6 +585,26 @@ export interface operations {
                         /** @example ok */
                         status?: string;
                     };
+                };
+            };
+        };
+    };
+    version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Version"];
                 };
             };
         };

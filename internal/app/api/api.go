@@ -6,6 +6,7 @@ import (
 	"time"
 
 	scalargo "github.com/bdpiprava/scalar-go"
+	catena "github.com/floffah/catena"
 	"github.com/floffah/catena/api"
 	"github.com/floffah/catena/internal/app/gitserver"
 	"github.com/floffah/catena/internal/pkg/auth"
@@ -81,4 +82,11 @@ func NewServer(
 func (s *Server) Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error) {
 	ok := "ok"
 	return Healthz200JSONResponse{Status: &ok}, nil
+}
+
+func (s *Server) Version(ctx context.Context, request VersionRequestObject) (VersionResponseObject, error) {
+	return Version200JSONResponse{
+		Commit:  catena.Commit,
+		Version: catena.Version,
+	}, nil
 }

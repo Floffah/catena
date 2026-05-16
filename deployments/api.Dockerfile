@@ -9,6 +9,7 @@ RUN apk add --no-cache ca-certificates git
 COPY go.mod go.sum ./
 RUN go mod download
 
+COPY build.go ./
 COPY api ./api
 COPY cmd ./cmd
 COPY data ./data
@@ -17,8 +18,9 @@ COPY tern.conf ./
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
+ARG RAILWAY_GIT_COMMIT_SHA=unknown
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags="-s -w" -o /out/catena-api ./cmd/api
+    go build -trimpath -ldflags="-s -w -X github.com/floffah/catena.Commit=$RAILWAY_GIT_COMMIT_SHA" -o /out/catena-api ./cmd/api
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags="-s -w" -o /out/tern github.com/jackc/tern/v2
 
