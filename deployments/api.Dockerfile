@@ -24,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates git su-exec \
+RUN apk add --no-cache ca-certificates git git-daemon su-exec \
     && addgroup -S catena \
     && adduser -S -G catena catena \
     && mkdir -p /var/lib/catena/git \
