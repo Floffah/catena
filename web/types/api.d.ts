@@ -61,7 +61,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Authenticated User
+         * @description Merge-update Catena-owned profile fields for the authenticated user.
+         */
+        patch: operations["updateAuthenticatedUser"];
         trace?: never;
     };
     "/v1/users/clerk/{clerkUserId}": {
@@ -460,10 +464,15 @@ export interface components {
             name: string;
             displayName?: string | null;
             avatarUrl?: string | null;
+            /** Format: email */
+            email?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        UpdateAuthenticatedUserRequest: {
+            displayName?: string;
         };
     };
     responses: {
@@ -557,6 +566,8 @@ export type SchemaRepositoryTree = components["schemas"]["RepositoryTree"];
 export type SchemaRepositoryTreeEntry =
     components["schemas"]["RepositoryTreeEntry"];
 export type SchemaUser = components["schemas"]["User"];
+export type SchemaUpdateAuthenticatedUserRequest =
+    components["schemas"]["UpdateAuthenticatedUserRequest"];
 export type ResponseBadRequest = components["responses"]["BadRequest"];
 export type ResponseConflict = components["responses"]["Conflict"];
 export type ResponseForbidden = components["responses"]["Forbidden"];
@@ -627,6 +638,33 @@ export interface operations {
                     "application/json": components["schemas"]["User"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateAuthenticatedUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAuthenticatedUserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalServerError"];
         };

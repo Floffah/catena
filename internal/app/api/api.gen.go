@@ -250,14 +250,20 @@ type ResolvedRepositoryGitPath struct {
 // ResolvedRepositoryGitPathPathType defines model for ResolvedRepositoryGitPath.PathType.
 type ResolvedRepositoryGitPathPathType string
 
+// UpdateAuthenticatedUserRequest defines model for UpdateAuthenticatedUserRequest.
+type UpdateAuthenticatedUserRequest struct {
+	DisplayName *string `json:"displayName,omitempty"`
+}
+
 // User defines model for User.
 type User struct {
-	AvatarUrl   *string            `json:"avatarUrl,omitempty"`
-	CreatedAt   time.Time          `json:"createdAt"`
-	DisplayName *string            `json:"displayName,omitempty"`
-	Id          openapi_types.UUID `json:"id"`
-	Name        string             `json:"name"`
-	UpdatedAt   time.Time          `json:"updatedAt"`
+	AvatarUrl   *string              `json:"avatarUrl,omitempty"`
+	CreatedAt   time.Time            `json:"createdAt"`
+	DisplayName *string              `json:"displayName,omitempty"`
+	Email       *openapi_types.Email `json:"email,omitempty"`
+	Id          openapi_types.UUID   `json:"id"`
+	Name        string               `json:"name"`
+	UpdatedAt   time.Time            `json:"updatedAt"`
 }
 
 // Version defines model for Version.
@@ -328,6 +334,9 @@ type CreateGitAccessTokenJSONRequestBody = CreateGitAccessTokenRequest
 
 // CreateRepositoryJSONRequestBody defines body for CreateRepository for application/json ContentType.
 type CreateRepositoryJSONRequestBody = CreateRepositoryRequest
+
+// UpdateAuthenticatedUserJSONRequestBody defines body for UpdateAuthenticatedUser for application/json ContentType.
+type UpdateAuthenticatedUserJSONRequestBody = UpdateAuthenticatedUserRequest
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -444,6 +453,11 @@ type ClientInterface interface {
 
 	// GetAuthenticatedUser request
 	GetAuthenticatedUser(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthenticatedUserWithBody request with any body
+	UpdateAuthenticatedUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAuthenticatedUser(ctx context.Context, body UpdateAuthenticatedUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetUserByClerkUserId request
 	GetUserByClerkUserId(ctx context.Context, clerkUserId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -625,6 +639,30 @@ func (c *Client) GetRepositoryTree(ctx context.Context, owner string, repository
 
 func (c *Client) GetAuthenticatedUser(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAuthenticatedUserRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAuthenticatedUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthenticatedUserRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAuthenticatedUser(ctx context.Context, body UpdateAuthenticatedUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthenticatedUserRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1293,6 +1331,46 @@ func NewGetAuthenticatedUserRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewUpdateAuthenticatedUserRequest calls the generic UpdateAuthenticatedUser builder with application/json body
+func NewUpdateAuthenticatedUserRequest(server string, body UpdateAuthenticatedUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAuthenticatedUserRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateAuthenticatedUserRequestWithBody generates requests for UpdateAuthenticatedUser with any type of body
+func NewUpdateAuthenticatedUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/user")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetUserByClerkUserIdRequest generates requests for GetUserByClerkUserId
 func NewGetUserByClerkUserIdRequest(server string, clerkUserId string) (*http.Request, error) {
 	var err error
@@ -1473,6 +1551,11 @@ type ClientWithResponsesInterface interface {
 
 	// GetAuthenticatedUserWithResponse request
 	GetAuthenticatedUserWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthenticatedUserClientResponse, error)
+
+	// UpdateAuthenticatedUserWithBodyWithResponse request with any body
+	UpdateAuthenticatedUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthenticatedUserClientResponse, error)
+
+	UpdateAuthenticatedUserWithResponse(ctx context.Context, body UpdateAuthenticatedUserJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthenticatedUserClientResponse, error)
 
 	// GetUserByClerkUserIdWithResponse request
 	GetUserByClerkUserIdWithResponse(ctx context.Context, clerkUserId string, reqEditors ...RequestEditorFn) (*GetUserByClerkUserIdClientResponse, error)
@@ -1810,6 +1893,31 @@ func (r GetAuthenticatedUserClientResponse) StatusCode() int {
 	return 0
 }
 
+type UpdateAuthenticatedUserClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *User
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAuthenticatedUserClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAuthenticatedUserClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetUserByClerkUserIdClientResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2013,6 +2121,23 @@ func (c *ClientWithResponses) GetAuthenticatedUserWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseGetAuthenticatedUserClientResponse(rsp)
+}
+
+// UpdateAuthenticatedUserWithBodyWithResponse request with arbitrary body returning *UpdateAuthenticatedUserClientResponse
+func (c *ClientWithResponses) UpdateAuthenticatedUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthenticatedUserClientResponse, error) {
+	rsp, err := c.UpdateAuthenticatedUserWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthenticatedUserClientResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAuthenticatedUserWithResponse(ctx context.Context, body UpdateAuthenticatedUserJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthenticatedUserClientResponse, error) {
+	rsp, err := c.UpdateAuthenticatedUser(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthenticatedUserClientResponse(rsp)
 }
 
 // GetUserByClerkUserIdWithResponse request returning *GetUserByClerkUserIdClientResponse
@@ -2648,6 +2773,53 @@ func ParseGetAuthenticatedUserClientResponse(rsp *http.Response) (*GetAuthentica
 	return response, nil
 }
 
+// ParseUpdateAuthenticatedUserClientResponse parses an HTTP response from a UpdateAuthenticatedUserWithResponse call
+func ParseUpdateAuthenticatedUserClientResponse(rsp *http.Response) (*UpdateAuthenticatedUserClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAuthenticatedUserClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest User
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetUserByClerkUserIdClientResponse parses an HTTP response from a GetUserByClerkUserIdWithResponse call
 func ParseGetUserByClerkUserIdClientResponse(rsp *http.Response) (*GetUserByClerkUserIdClientResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -2809,6 +2981,9 @@ type ServerInterface interface {
 	// Get Authenticated User
 	// (GET /v1/user)
 	GetAuthenticatedUser(c *gin.Context)
+	// Update Authenticated User
+	// (PATCH /v1/user)
+	UpdateAuthenticatedUser(c *gin.Context)
 	// Get User By Clerk ID
 	// (GET /v1/users/clerk/{clerkUserId})
 	GetUserByClerkUserId(c *gin.Context, clerkUserId string)
@@ -3239,6 +3414,21 @@ func (siw *ServerInterfaceWrapper) GetAuthenticatedUser(c *gin.Context) {
 	siw.Handler.GetAuthenticatedUser(c)
 }
 
+// UpdateAuthenticatedUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAuthenticatedUser(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateAuthenticatedUser(c)
+}
+
 // GetUserByClerkUserId operation middleware
 func (siw *ServerInterfaceWrapper) GetUserByClerkUserId(c *gin.Context) {
 
@@ -3342,6 +3532,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/refs", wrapper.ListRepositoryRefs)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/tree", wrapper.GetRepositoryTree)
 	router.GET(options.BaseURL+"/v1/user", wrapper.GetAuthenticatedUser)
+	router.PATCH(options.BaseURL+"/v1/user", wrapper.UpdateAuthenticatedUser)
 	router.GET(options.BaseURL+"/v1/users/clerk/:clerkUserId", wrapper.GetUserByClerkUserId)
 	router.GET(options.BaseURL+"/v1/users/name/:name", wrapper.GetUserByName)
 	router.GET(options.BaseURL+"/v1/version", wrapper.Version)
@@ -3963,6 +4154,52 @@ func (response GetAuthenticatedUser500JSONResponse) VisitGetAuthenticatedUserRes
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UpdateAuthenticatedUserRequestObject struct {
+	Body *UpdateAuthenticatedUserJSONRequestBody
+}
+
+type UpdateAuthenticatedUserResponseObject interface {
+	VisitUpdateAuthenticatedUserResponse(w http.ResponseWriter) error
+}
+
+type UpdateAuthenticatedUser200JSONResponse User
+
+func (response UpdateAuthenticatedUser200JSONResponse) VisitUpdateAuthenticatedUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAuthenticatedUser400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateAuthenticatedUser400JSONResponse) VisitUpdateAuthenticatedUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAuthenticatedUser401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateAuthenticatedUser401JSONResponse) VisitUpdateAuthenticatedUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAuthenticatedUser500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response UpdateAuthenticatedUser500JSONResponse) VisitUpdateAuthenticatedUserResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetUserByClerkUserIdRequestObject struct {
 	ClerkUserId string `json:"clerkUserId"`
 }
@@ -4112,6 +4349,9 @@ type StrictServerInterface interface {
 	// Get Authenticated User
 	// (GET /v1/user)
 	GetAuthenticatedUser(ctx context.Context, request GetAuthenticatedUserRequestObject) (GetAuthenticatedUserResponseObject, error)
+	// Update Authenticated User
+	// (PATCH /v1/user)
+	UpdateAuthenticatedUser(ctx context.Context, request UpdateAuthenticatedUserRequestObject) (UpdateAuthenticatedUserResponseObject, error)
 	// Get User By Clerk ID
 	// (GET /v1/users/clerk/{clerkUserId})
 	GetUserByClerkUserId(ctx context.Context, request GetUserByClerkUserIdRequestObject) (GetUserByClerkUserIdResponseObject, error)
@@ -4494,6 +4734,39 @@ func (sh *strictHandler) GetAuthenticatedUser(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(GetAuthenticatedUserResponseObject); ok {
 		if err := validResponse.VisitGetAuthenticatedUserResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAuthenticatedUser operation middleware
+func (sh *strictHandler) UpdateAuthenticatedUser(ctx *gin.Context) {
+	var request UpdateAuthenticatedUserRequestObject
+
+	var body UpdateAuthenticatedUserJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
+		ctx.Error(err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAuthenticatedUser(ctx, request.(UpdateAuthenticatedUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAuthenticatedUser")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(UpdateAuthenticatedUserResponseObject); ok {
+		if err := validResponse.VisitUpdateAuthenticatedUserResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {

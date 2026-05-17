@@ -111,11 +111,23 @@ func (s *AuthService) GetUserFromAuth(ctx context.Context, auth *Auth) (db.User,
 		displayName = name
 	}
 
+	primaryEmail := "catenauser+" + authUser.ID + "@oncatena.com"
+
+	if authUser.PrimaryEmailAddressID != nil {
+		for _, email := range authUser.EmailAddresses {
+			if email.ID == *authUser.PrimaryEmailAddressID {
+				primaryEmail = email.EmailAddress
+				break
+			}
+		}
+	}
+
 	newUser, err := s.repository.CreateUser(ctx, db.CreateUserParams{
 		ClerkUserID: authUser.ID,
 		Name:        name,
 		DisplayName: &displayName,
 		AvatarUrl:   authUser.ImageURL,
+		Email:       primaryEmail,
 	})
 
 	if err != nil {

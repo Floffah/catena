@@ -15,12 +15,14 @@ insert into users (
   clerk_user_id,
   name,
   display_name,
-  avatar_url
+  avatar_url,
+  email
 ) values (
   $1,
   $2,
   $3,
-  $4
+  $4,
+  $5
 )
 returning *;
 

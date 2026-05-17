@@ -27,7 +27,7 @@ in rough order of priority:
 - [x] Web repo browser [FR-006, FR-007]
 - [x] Product API foundation [FR-005]
 - [x] Database foundation [FR-004]
-- [ ] Manage account & tokens [FR-003]
+- [x] Manage account & tokens [FR-003]
 - [ ] Issues <- at this point a production deployment will be created [FR-008]
 - [ ] External project management integrations [FR-009]
 - [ ] Pull requests [FR-010]

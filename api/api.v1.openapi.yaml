@@ -75,6 +75,31 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+        - v1
+      summary: Update Authenticated User
+      description: Merge-update Catena-owned profile fields for the authenticated user.
+      operationId: updateAuthenticatedUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAuthenticatedUserRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/users/clerk/{clerkUserId}":
     get:
       tags:
@@ -851,12 +876,21 @@ components:
         avatarUrl:
           type: string
           nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    UpdateAuthenticatedUserRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
   responses:
     BadRequest:
       description: Bad Request

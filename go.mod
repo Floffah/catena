@@ -20,9 +20,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/oapi-codegen/runtime v1.4.0
+	github.com/zeebo/assert v1.3.1
 )
-
-require github.com/zeebo/assert v1.1.0
 
 require (
 	aead.dev/minisign v0.3.0 // indirect

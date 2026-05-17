@@ -92,6 +92,8 @@ func (q *Queries) GetGitAccessTokenByHash(ctx context.Context, tokenHash []byte)
 const listGitAccessTokensByUserID = `-- name: ListGitAccessTokensByUserID :many
 select id, user_id, name, token_hash, token_prefix, scopes, last_used_at, expires_at, revoked_at, created_at, updated_at from git_access_tokens
 where user_id = $1
+  and revoked_at is null
+  and (expires_at is null or expires_at > now())
 order by created_at desc
 `
 

@@ -7,8 +7,9 @@ import { ComponentProps } from "react";
 export default function UserProfileDialogButton({
     asChild,
     onClick,
+    startPath,
     ...props
-}: ComponentProps<"button"> & { asChild?: boolean }) {
+}: ComponentProps<"button"> & { asChild?: boolean; startPath?: string }) {
     const { openUserProfile } = useClerk();
 
     const Comp = asChild ? Slot.Root : "button";
@@ -19,7 +20,7 @@ export default function UserProfileDialogButton({
                 onClick?.(e);
 
                 if (!e.defaultPrevented && !e.isPropagationStopped()) {
-                    openUserProfile();
+                    openUserProfile({ __experimental_startPath: startPath });
                 }
             }}
             {...props}

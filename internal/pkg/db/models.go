@@ -84,6 +84,7 @@ type User struct {
 	Name        string
 	DisplayName *string
 	AvatarUrl   *string
+	Email       string
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
 }

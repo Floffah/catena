@@ -1,12 +1,8 @@
 import { SignInButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
 import { Suspense } from "react";
 
 import { UserAvatarFallback } from "@/components/UserAvatar";
-import {
-    serverGetCurrentUser,
-    serverGetUserForClerkID,
-} from "@/lib/server/users";
+import { serverGetCurrentUser } from "@/lib/server/users";
 
 import ProfileDropdown from "./dropdown";
 

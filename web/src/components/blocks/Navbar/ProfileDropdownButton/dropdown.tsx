@@ -1,11 +1,10 @@
 "use client";
 
-import { SignOutButton, useClerk } from "@clerk/nextjs";
-import { IconLogout, IconUserCog } from "@tabler/icons-react";
+import { SignOutButton } from "@clerk/nextjs";
+import { IconLogout, IconUserEdit } from "@tabler/icons-react";
 import Link from "next/link";
 
 import UserAvatar from "@/components/UserAvatar";
-import UserProfileDialogButton from "@/components/UserProfileDialogButton";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -44,10 +43,10 @@ export default function ProfileDropdown({
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                     <DropdownMenuItem asChild>
-                        <UserProfileDialogButton>
-                            <IconUserCog className="size-4" />
-                            Manage Account
-                        </UserProfileDialogButton>
+                        <Link href="/settings">
+                            <IconUserEdit className="size-4" />
+                            Settings
+                        </Link>
                     </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />

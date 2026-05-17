@@ -16,14 +16,16 @@ insert into users (
   clerk_user_id,
   name,
   display_name,
-  avatar_url
+  avatar_url,
+  email
 ) values (
   $1,
   $2,
   $3,
-  $4
+  $4,
+  $5
 )
-returning id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at
+returning id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -31,6 +33,7 @@ type CreateUserParams struct {
 	Name        string
 	DisplayName *string
 	AvatarUrl   *string
+	Email       string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -39,6 +42,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Name,
 		arg.DisplayName,
 		arg.AvatarUrl,
+		arg.Email,
 	)
 	var i User
 	err := row.Scan(
@@ -47,6 +51,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Name,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -64,7 +69,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getUserByClerkUserID = `-- name: GetUserByClerkUserID :one
-select id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at from users
+select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at from users
 where clerk_user_id = $1
 `
 
@@ -77,6 +82,7 @@ func (q *Queries) GetUserByClerkUserID(ctx context.Context, clerkUserID string) 
 		&i.Name,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -84,7 +90,7 @@ func (q *Queries) GetUserByClerkUserID(ctx context.Context, clerkUserID string) 
 }
 
 const getUserByID = `-- name: GetUserByID :one
-select id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at from users
+select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at from users
 where id = $1
 `
 
@@ -97,6 +103,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.Name,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -104,7 +111,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 }
 
 const getUserByName = `-- name: GetUserByName :one
-select id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at from users
+select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at from users
 where name = $1
 `
 
@@ -117,6 +124,7 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (User, error) 
 		&i.Name,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -130,7 +138,7 @@ set
   display_name = $3,
   avatar_url = $4
 where id = $1
-returning id, clerk_user_id, name, display_name, avatar_url, created_at, updated_at
+returning id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at
 `
 
 type UpdateUserProfileParams struct {
@@ -154,6 +162,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.Name,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

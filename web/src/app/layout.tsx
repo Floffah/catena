@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { Geist, Geist_Mono } from "next/font/google";
 import { PropsWithChildren } from "react";
 
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import AuthProvider from "@/providers/AuthProvider";
 import QueryClientProvider from "@/providers/QueryClientProvider";
@@ -36,7 +37,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
             )}
             suppressHydrationWarning
         >
-            <body className="flex min-h-full flex-col">
+            <body className="flex min-h-full flex-col" suppressHydrationWarning>
                 <ThemeProvider
                     attribute="class"
                     defaultTheme="system"
@@ -46,7 +47,11 @@ export default function RootLayout({ children }: PropsWithChildren) {
                 >
                     <ClerkProvider appearance={{ theme: shadcn }}>
                         <QueryClientProvider>
-                            <AuthProvider>{children}</AuthProvider>
+                            <AuthProvider>
+                                {children}
+
+                                <SidebarProvider />
+                            </AuthProvider>
                         </QueryClientProvider>
                     </ClerkProvider>
                 </ThemeProvider>

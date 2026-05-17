@@ -6,6 +6,7 @@ import (
 	"github.com/floffah/catena/internal/pkg/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 func RepositoryToAPI(repository db.Repository, ownerName string) (Repository, error) {
@@ -42,6 +43,7 @@ func UserToAPI(user db.User) (User, error) {
 		AvatarUrl:   user.AvatarUrl,
 		CreatedAt:   user.CreatedAt.Time,
 		DisplayName: user.DisplayName,
+		Email:       new(openapi_types.Email(user.Email)),
 		Id:          id,
 		Name:        user.Name,
 		UpdatedAt:   user.UpdatedAt.Time,

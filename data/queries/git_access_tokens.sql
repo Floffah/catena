@@ -19,6 +19,8 @@ returning *;
 -- name: ListGitAccessTokensByUserID :many
 select * from git_access_tokens
 where user_id = $1
+  and revoked_at is null
+  and (expires_at is null or expires_at > now())
 order by created_at desc;
 
 -- name: GetGitAccessTokenByHash :one
