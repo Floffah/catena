@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,159 @@ import (
 const (
 	BearerAuthScopes = "bearerAuth.Scopes"
 )
+
+// Defines values for IssueStatus.
+const (
+	IssueStatusCancelled  IssueStatus = "cancelled"
+	IssueStatusCompleted  IssueStatus = "completed"
+	IssueStatusInProgress IssueStatus = "in_progress"
+	IssueStatusOpen       IssueStatus = "open"
+)
+
+// Valid indicates whether the value is a known member of the IssueStatus enum.
+func (e IssueStatus) Valid() bool {
+	switch e {
+	case IssueStatusCancelled:
+		return true
+	case IssueStatusCompleted:
+		return true
+	case IssueStatusInProgress:
+		return true
+	case IssueStatusOpen:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PullRequestStatus.
+const (
+	PullRequestStatusCancelled PullRequestStatus = "cancelled"
+	PullRequestStatusMerged    PullRequestStatus = "merged"
+	PullRequestStatusOpen      PullRequestStatus = "open"
+)
+
+// Valid indicates whether the value is a known member of the PullRequestStatus enum.
+func (e PullRequestStatus) Valid() bool {
+	switch e {
+	case PullRequestStatusCancelled:
+		return true
+	case PullRequestStatusMerged:
+		return true
+	case PullRequestStatusOpen:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RepositoryItemBodyChangedTimelinePayloadType.
+const (
+	BodyChanged RepositoryItemBodyChangedTimelinePayloadType = "body_changed"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryItemBodyChangedTimelinePayloadType enum.
+func (e RepositoryItemBodyChangedTimelinePayloadType) Valid() bool {
+	switch e {
+	case BodyChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RepositoryItemCommentTimelinePayloadType.
+const (
+	Comment RepositoryItemCommentTimelinePayloadType = "comment"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryItemCommentTimelinePayloadType enum.
+func (e RepositoryItemCommentTimelinePayloadType) Valid() bool {
+	switch e {
+	case Comment:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RepositoryItemIssueStatusChangedTimelinePayloadType.
+const (
+	IssueStatusChanged RepositoryItemIssueStatusChangedTimelinePayloadType = "issue_status_changed"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryItemIssueStatusChangedTimelinePayloadType enum.
+func (e RepositoryItemIssueStatusChangedTimelinePayloadType) Valid() bool {
+	switch e {
+	case IssueStatusChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RepositoryItemKind.
+const (
+	RepositoryItemKindIssue       RepositoryItemKind = "issue"
+	RepositoryItemKindPullRequest RepositoryItemKind = "pull_request"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryItemKind enum.
+func (e RepositoryItemKind) Valid() bool {
+	switch e {
+	case RepositoryItemKindIssue:
+		return true
+	case RepositoryItemKindPullRequest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RepositoryItemLabelsChangedTimelinePayloadType.
+const (
+	LabelsChanged RepositoryItemLabelsChangedTimelinePayloadType = "labels_changed"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryItemLabelsChangedTimelinePayloadType enum.
+func (e RepositoryItemLabelsChangedTimelinePayloadType) Valid() bool {
+	switch e {
+	case LabelsChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RepositoryItemPullRequestStatusChangedTimelinePayloadType.
+const (
+	PullRequestStatusChanged RepositoryItemPullRequestStatusChangedTimelinePayloadType = "pull_request_status_changed"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryItemPullRequestStatusChangedTimelinePayloadType enum.
+func (e RepositoryItemPullRequestStatusChangedTimelinePayloadType) Valid() bool {
+	switch e {
+	case PullRequestStatusChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RepositoryItemTitleChangedTimelinePayloadType.
+const (
+	TitleChanged RepositoryItemTitleChangedTimelinePayloadType = "title_changed"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryItemTitleChangedTimelinePayloadType enum.
+func (e RepositoryItemTitleChangedTimelinePayloadType) Valid() bool {
+	switch e {
+	case TitleChanged:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for RepositoryRefType.
 const (
@@ -160,10 +314,49 @@ type GitAccessToken struct {
 	UpdatedAt   time.Time          `json:"updatedAt"`
 }
 
+// Issue defines model for Issue.
+type Issue struct {
+	// AuthorId Null when the author account has been deleted.
+	AuthorId       *openapi_types.UUID `json:"authorId"`
+	Body           *string             `json:"body,omitempty"`
+	CreatedAt      time.Time           `json:"createdAt"`
+	Id             openapi_types.UUID  `json:"id"`
+	Kind           RepositoryItemKind  `json:"kind"`
+	LastActivityAt time.Time           `json:"lastActivityAt"`
+	Number         int64               `json:"number"`
+
+	// Reference User-facing repository item reference, such as `CAT-1`.
+	Reference    string             `json:"reference"`
+	RepositoryId openapi_types.UUID `json:"repositoryId"`
+	Status       IssueStatus        `json:"status"`
+	Title        string             `json:"title"`
+	UpdatedAt    time.Time          `json:"updatedAt"`
+}
+
+// IssueStatus defines model for IssueStatus.
+type IssueStatus string
+
+// Label defines model for Label.
+type Label struct {
+	// Color Six-digit hexadecimal color prefixed with `#`.
+	Color       string             `json:"color"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	Description *string            `json:"description,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Name Labels are stored in lowercase.
+	Name         string             `json:"name"`
+	RepositoryId openapi_types.UUID `json:"repositoryId"`
+	UpdatedAt    time.Time          `json:"updatedAt"`
+}
+
 // ListRepositoryRefsResponse defines model for ListRepositoryRefsResponse.
 type ListRepositoryRefsResponse struct {
 	Refs []RepositoryRef `json:"refs"`
 }
+
+// PullRequestStatus defines model for PullRequestStatus.
+type PullRequestStatus string
 
 // Repository defines model for Repository.
 type Repository struct {
@@ -177,6 +370,111 @@ type Repository struct {
 	UpdatedAt     time.Time            `json:"updatedAt"`
 	Visibility    RepositoryVisibility `json:"visibility"`
 }
+
+// RepositoryItem defines model for RepositoryItem.
+type RepositoryItem struct {
+	// AuthorId Null when the author account has been deleted.
+	AuthorId       *openapi_types.UUID `json:"authorId"`
+	Body           *string             `json:"body,omitempty"`
+	CreatedAt      time.Time           `json:"createdAt"`
+	Id             openapi_types.UUID  `json:"id"`
+	Kind           RepositoryItemKind  `json:"kind"`
+	LastActivityAt time.Time           `json:"lastActivityAt"`
+	Number         int64               `json:"number"`
+
+	// Reference User-facing repository item reference, such as `CAT-1`.
+	Reference    string             `json:"reference"`
+	RepositoryId openapi_types.UUID `json:"repositoryId"`
+	Title        string             `json:"title"`
+	UpdatedAt    time.Time          `json:"updatedAt"`
+}
+
+// RepositoryItemBodyChangedTimelinePayload defines model for RepositoryItemBodyChangedTimelinePayload.
+type RepositoryItemBodyChangedTimelinePayload struct {
+	// Diff Unified diff of the markdown source body.
+	Diff string                                       `json:"diff"`
+	Type RepositoryItemBodyChangedTimelinePayloadType `json:"type"`
+}
+
+// RepositoryItemBodyChangedTimelinePayloadType defines model for RepositoryItemBodyChangedTimelinePayload.Type.
+type RepositoryItemBodyChangedTimelinePayloadType string
+
+// RepositoryItemCommentTimelinePayload defines model for RepositoryItemCommentTimelinePayload.
+type RepositoryItemCommentTimelinePayload struct {
+	Body string                                   `json:"body"`
+	Type RepositoryItemCommentTimelinePayloadType `json:"type"`
+}
+
+// RepositoryItemCommentTimelinePayloadType defines model for RepositoryItemCommentTimelinePayload.Type.
+type RepositoryItemCommentTimelinePayloadType string
+
+// RepositoryItemIssueStatusChangedTimelinePayload defines model for RepositoryItemIssueStatusChangedTimelinePayload.
+type RepositoryItemIssueStatusChangedTimelinePayload struct {
+	NewStatus      IssueStatus                                         `json:"newStatus"`
+	PreviousStatus IssueStatus                                         `json:"previousStatus"`
+	Type           RepositoryItemIssueStatusChangedTimelinePayloadType `json:"type"`
+}
+
+// RepositoryItemIssueStatusChangedTimelinePayloadType defines model for RepositoryItemIssueStatusChangedTimelinePayload.Type.
+type RepositoryItemIssueStatusChangedTimelinePayloadType string
+
+// RepositoryItemKind defines model for RepositoryItemKind.
+type RepositoryItemKind string
+
+// RepositoryItemLabelsChangedTimelinePayload defines model for RepositoryItemLabelsChangedTimelinePayload.
+type RepositoryItemLabelsChangedTimelinePayload struct {
+	AddedLabels   []RepositoryItemTimelineLabelSnapshot          `json:"addedLabels"`
+	RemovedLabels []RepositoryItemTimelineLabelSnapshot          `json:"removedLabels"`
+	Type          RepositoryItemLabelsChangedTimelinePayloadType `json:"type"`
+}
+
+// RepositoryItemLabelsChangedTimelinePayloadType defines model for RepositoryItemLabelsChangedTimelinePayload.Type.
+type RepositoryItemLabelsChangedTimelinePayloadType string
+
+// RepositoryItemPullRequestStatusChangedTimelinePayload defines model for RepositoryItemPullRequestStatusChangedTimelinePayload.
+type RepositoryItemPullRequestStatusChangedTimelinePayload struct {
+	NewStatus      PullRequestStatus                                         `json:"newStatus"`
+	PreviousStatus PullRequestStatus                                         `json:"previousStatus"`
+	Type           RepositoryItemPullRequestStatusChangedTimelinePayloadType `json:"type"`
+}
+
+// RepositoryItemPullRequestStatusChangedTimelinePayloadType defines model for RepositoryItemPullRequestStatusChangedTimelinePayload.Type.
+type RepositoryItemPullRequestStatusChangedTimelinePayloadType string
+
+// RepositoryItemTimelineEntry defines model for RepositoryItemTimelineEntry.
+type RepositoryItemTimelineEntry struct {
+	// ActorId Null when the actor account has been deleted.
+	ActorId          *openapi_types.UUID           `json:"actorId"`
+	CreatedAt        time.Time                     `json:"createdAt"`
+	Id               openapi_types.UUID            `json:"id"`
+	Payload          RepositoryItemTimelinePayload `json:"payload"`
+	RepositoryItemId openapi_types.UUID            `json:"repositoryItemId"`
+	UpdatedAt        time.Time                     `json:"updatedAt"`
+}
+
+// RepositoryItemTimelineLabelSnapshot defines model for RepositoryItemTimelineLabelSnapshot.
+type RepositoryItemTimelineLabelSnapshot struct {
+	Color string             `json:"color"`
+	Id    openapi_types.UUID `json:"id"`
+
+	// Name Labels are stored in lowercase.
+	Name string `json:"name"`
+}
+
+// RepositoryItemTimelinePayload defines model for RepositoryItemTimelinePayload.
+type RepositoryItemTimelinePayload struct {
+	union json.RawMessage
+}
+
+// RepositoryItemTitleChangedTimelinePayload defines model for RepositoryItemTitleChangedTimelinePayload.
+type RepositoryItemTitleChangedTimelinePayload struct {
+	NewTitle      string                                        `json:"newTitle"`
+	PreviousTitle string                                        `json:"previousTitle"`
+	Type          RepositoryItemTitleChangedTimelinePayloadType `json:"type"`
+}
+
+// RepositoryItemTitleChangedTimelinePayloadType defines model for RepositoryItemTitleChangedTimelinePayload.Type.
+type RepositoryItemTitleChangedTimelinePayloadType string
 
 // RepositoryLatestCommit defines model for RepositoryLatestCommit.
 type RepositoryLatestCommit struct {
@@ -337,6 +635,215 @@ type CreateRepositoryJSONRequestBody = CreateRepositoryRequest
 
 // UpdateAuthenticatedUserJSONRequestBody defines body for UpdateAuthenticatedUser for application/json ContentType.
 type UpdateAuthenticatedUserJSONRequestBody = UpdateAuthenticatedUserRequest
+
+// AsRepositoryItemCommentTimelinePayload returns the union data inside the RepositoryItemTimelinePayload as a RepositoryItemCommentTimelinePayload
+func (t RepositoryItemTimelinePayload) AsRepositoryItemCommentTimelinePayload() (RepositoryItemCommentTimelinePayload, error) {
+	var body RepositoryItemCommentTimelinePayload
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRepositoryItemCommentTimelinePayload overwrites any union data inside the RepositoryItemTimelinePayload as the provided RepositoryItemCommentTimelinePayload
+func (t *RepositoryItemTimelinePayload) FromRepositoryItemCommentTimelinePayload(v RepositoryItemCommentTimelinePayload) error {
+	v.Type = "comment"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRepositoryItemCommentTimelinePayload performs a merge with any union data inside the RepositoryItemTimelinePayload, using the provided RepositoryItemCommentTimelinePayload
+func (t *RepositoryItemTimelinePayload) MergeRepositoryItemCommentTimelinePayload(v RepositoryItemCommentTimelinePayload) error {
+	v.Type = "comment"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRepositoryItemTitleChangedTimelinePayload returns the union data inside the RepositoryItemTimelinePayload as a RepositoryItemTitleChangedTimelinePayload
+func (t RepositoryItemTimelinePayload) AsRepositoryItemTitleChangedTimelinePayload() (RepositoryItemTitleChangedTimelinePayload, error) {
+	var body RepositoryItemTitleChangedTimelinePayload
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRepositoryItemTitleChangedTimelinePayload overwrites any union data inside the RepositoryItemTimelinePayload as the provided RepositoryItemTitleChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) FromRepositoryItemTitleChangedTimelinePayload(v RepositoryItemTitleChangedTimelinePayload) error {
+	v.Type = "title_changed"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRepositoryItemTitleChangedTimelinePayload performs a merge with any union data inside the RepositoryItemTimelinePayload, using the provided RepositoryItemTitleChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) MergeRepositoryItemTitleChangedTimelinePayload(v RepositoryItemTitleChangedTimelinePayload) error {
+	v.Type = "title_changed"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRepositoryItemBodyChangedTimelinePayload returns the union data inside the RepositoryItemTimelinePayload as a RepositoryItemBodyChangedTimelinePayload
+func (t RepositoryItemTimelinePayload) AsRepositoryItemBodyChangedTimelinePayload() (RepositoryItemBodyChangedTimelinePayload, error) {
+	var body RepositoryItemBodyChangedTimelinePayload
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRepositoryItemBodyChangedTimelinePayload overwrites any union data inside the RepositoryItemTimelinePayload as the provided RepositoryItemBodyChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) FromRepositoryItemBodyChangedTimelinePayload(v RepositoryItemBodyChangedTimelinePayload) error {
+	v.Type = "body_changed"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRepositoryItemBodyChangedTimelinePayload performs a merge with any union data inside the RepositoryItemTimelinePayload, using the provided RepositoryItemBodyChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) MergeRepositoryItemBodyChangedTimelinePayload(v RepositoryItemBodyChangedTimelinePayload) error {
+	v.Type = "body_changed"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRepositoryItemLabelsChangedTimelinePayload returns the union data inside the RepositoryItemTimelinePayload as a RepositoryItemLabelsChangedTimelinePayload
+func (t RepositoryItemTimelinePayload) AsRepositoryItemLabelsChangedTimelinePayload() (RepositoryItemLabelsChangedTimelinePayload, error) {
+	var body RepositoryItemLabelsChangedTimelinePayload
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRepositoryItemLabelsChangedTimelinePayload overwrites any union data inside the RepositoryItemTimelinePayload as the provided RepositoryItemLabelsChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) FromRepositoryItemLabelsChangedTimelinePayload(v RepositoryItemLabelsChangedTimelinePayload) error {
+	v.Type = "labels_changed"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRepositoryItemLabelsChangedTimelinePayload performs a merge with any union data inside the RepositoryItemTimelinePayload, using the provided RepositoryItemLabelsChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) MergeRepositoryItemLabelsChangedTimelinePayload(v RepositoryItemLabelsChangedTimelinePayload) error {
+	v.Type = "labels_changed"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRepositoryItemIssueStatusChangedTimelinePayload returns the union data inside the RepositoryItemTimelinePayload as a RepositoryItemIssueStatusChangedTimelinePayload
+func (t RepositoryItemTimelinePayload) AsRepositoryItemIssueStatusChangedTimelinePayload() (RepositoryItemIssueStatusChangedTimelinePayload, error) {
+	var body RepositoryItemIssueStatusChangedTimelinePayload
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRepositoryItemIssueStatusChangedTimelinePayload overwrites any union data inside the RepositoryItemTimelinePayload as the provided RepositoryItemIssueStatusChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) FromRepositoryItemIssueStatusChangedTimelinePayload(v RepositoryItemIssueStatusChangedTimelinePayload) error {
+	v.Type = "issue_status_changed"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRepositoryItemIssueStatusChangedTimelinePayload performs a merge with any union data inside the RepositoryItemTimelinePayload, using the provided RepositoryItemIssueStatusChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) MergeRepositoryItemIssueStatusChangedTimelinePayload(v RepositoryItemIssueStatusChangedTimelinePayload) error {
+	v.Type = "issue_status_changed"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRepositoryItemPullRequestStatusChangedTimelinePayload returns the union data inside the RepositoryItemTimelinePayload as a RepositoryItemPullRequestStatusChangedTimelinePayload
+func (t RepositoryItemTimelinePayload) AsRepositoryItemPullRequestStatusChangedTimelinePayload() (RepositoryItemPullRequestStatusChangedTimelinePayload, error) {
+	var body RepositoryItemPullRequestStatusChangedTimelinePayload
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRepositoryItemPullRequestStatusChangedTimelinePayload overwrites any union data inside the RepositoryItemTimelinePayload as the provided RepositoryItemPullRequestStatusChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) FromRepositoryItemPullRequestStatusChangedTimelinePayload(v RepositoryItemPullRequestStatusChangedTimelinePayload) error {
+	v.Type = "pull_request_status_changed"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRepositoryItemPullRequestStatusChangedTimelinePayload performs a merge with any union data inside the RepositoryItemTimelinePayload, using the provided RepositoryItemPullRequestStatusChangedTimelinePayload
+func (t *RepositoryItemTimelinePayload) MergeRepositoryItemPullRequestStatusChangedTimelinePayload(v RepositoryItemPullRequestStatusChangedTimelinePayload) error {
+	v.Type = "pull_request_status_changed"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RepositoryItemTimelinePayload) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t RepositoryItemTimelinePayload) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "body_changed":
+		return t.AsRepositoryItemBodyChangedTimelinePayload()
+	case "comment":
+		return t.AsRepositoryItemCommentTimelinePayload()
+	case "issue_status_changed":
+		return t.AsRepositoryItemIssueStatusChangedTimelinePayload()
+	case "labels_changed":
+		return t.AsRepositoryItemLabelsChangedTimelinePayload()
+	case "pull_request_status_changed":
+		return t.AsRepositoryItemPullRequestStatusChangedTimelinePayload()
+	case "title_changed":
+		return t.AsRepositoryItemTitleChangedTimelinePayload()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t RepositoryItemTimelinePayload) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RepositoryItemTimelinePayload) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error

@@ -39,6 +39,7 @@ read `justfile` or run `just` to see available commands. do not run dev commands
 ## Guidance
 
 - Keep generated files generated; edit OpenAPI specs, SQL queries, or migrations instead.
+- Treat published migrations as immutable; add a new migration for production schema changes instead of editing migrations that have already shipped.
 - Prefer explicit SQL and small service boundaries.
 - Do not implement Git internals until the platform can create, clone, push, and view repos using the Git binary.
 - Keep `internal/pkg/git` as a thin Git-binary wrapper; put Catena Git business logic in `internal/pkg/gitstore`.

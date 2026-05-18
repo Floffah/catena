@@ -690,6 +690,263 @@ components:
         updatedAt:
           type: string
           format: date-time
+    RepositoryItem:
+      type: object
+      required:
+        - id
+        - repositoryId
+        - number
+        - reference
+        - kind
+        - title
+        - authorId
+        - createdAt
+        - updatedAt
+        - lastActivityAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        repositoryId:
+          type: string
+          format: uuid
+        number:
+          type: integer
+          format: int64
+        reference:
+          type: string
+          description: User-facing repository item reference, such as `CAT-1`.
+        kind:
+          $ref: "#/components/schemas/RepositoryItemKind"
+        title:
+          type: string
+        body:
+          type: string
+          nullable: true
+        authorId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null when the author account has been deleted.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+    RepositoryItemKind:
+      type: string
+      enum:
+        - issue
+        - pull_request
+    Issue:
+      allOf:
+        - $ref: "#/components/schemas/RepositoryItem"
+        - type: object
+          required:
+            - status
+          properties:
+            status:
+              $ref: "#/components/schemas/IssueStatus"
+    IssueStatus:
+      type: string
+      enum:
+        - open
+        - in_progress
+        - completed
+        - cancelled
+    PullRequestStatus:
+      type: string
+      enum:
+        - open
+        - merged
+        - cancelled
+    Label:
+      type: object
+      required:
+        - id
+        - repositoryId
+        - name
+        - color
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        repositoryId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Labels are stored in lowercase.
+          example: bug
+        color:
+          type: string
+          description: Six-digit hexadecimal color prefixed with `#`.
+          example: "#d73a4a"
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RepositoryItemTimelineEntry:
+      type: object
+      required:
+        - id
+        - repositoryItemId
+        - actorId
+        - payload
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        repositoryItemId:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null when the actor account has been deleted.
+        payload:
+          $ref: "#/components/schemas/RepositoryItemTimelinePayload"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RepositoryItemTimelinePayload:
+      oneOf:
+        - $ref: "#/components/schemas/RepositoryItemCommentTimelinePayload"
+        - $ref: "#/components/schemas/RepositoryItemTitleChangedTimelinePayload"
+        - $ref: "#/components/schemas/RepositoryItemBodyChangedTimelinePayload"
+        - $ref: "#/components/schemas/RepositoryItemLabelsChangedTimelinePayload"
+        - $ref: "#/components/schemas/RepositoryItemIssueStatusChangedTimelinePayload"
+        - $ref: "#/components/schemas/RepositoryItemPullRequestStatusChangedTimelinePayload"
+      discriminator:
+        propertyName: type
+        mapping:
+          comment: "#/components/schemas/RepositoryItemCommentTimelinePayload"
+          title_changed: "#/components/schemas/RepositoryItemTitleChangedTimelinePayload"
+          body_changed: "#/components/schemas/RepositoryItemBodyChangedTimelinePayload"
+          labels_changed: "#/components/schemas/RepositoryItemLabelsChangedTimelinePayload"
+          issue_status_changed: "#/components/schemas/RepositoryItemIssueStatusChangedTimelinePayload"
+          pull_request_status_changed: "#/components/schemas/RepositoryItemPullRequestStatusChangedTimelinePayload"
+    RepositoryItemCommentTimelinePayload:
+      type: object
+      required:
+        - type
+        - body
+      properties:
+        type:
+          type: string
+          enum:
+            - comment
+        body:
+          type: string
+    RepositoryItemTitleChangedTimelinePayload:
+      type: object
+      required:
+        - type
+        - previousTitle
+        - newTitle
+      properties:
+        type:
+          type: string
+          enum:
+            - title_changed
+        previousTitle:
+          type: string
+        newTitle:
+          type: string
+    RepositoryItemBodyChangedTimelinePayload:
+      type: object
+      required:
+        - type
+        - diff
+      properties:
+        type:
+          type: string
+          enum:
+            - body_changed
+        diff:
+          type: string
+          description: Unified diff of the markdown source body.
+    RepositoryItemLabelsChangedTimelinePayload:
+      type: object
+      required:
+        - type
+        - addedLabels
+        - removedLabels
+      properties:
+        type:
+          type: string
+          enum:
+            - labels_changed
+        addedLabels:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryItemTimelineLabelSnapshot"
+        removedLabels:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryItemTimelineLabelSnapshot"
+    RepositoryItemTimelineLabelSnapshot:
+      type: object
+      required:
+        - id
+        - name
+        - color
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Labels are stored in lowercase.
+        color:
+          type: string
+    RepositoryItemIssueStatusChangedTimelinePayload:
+      type: object
+      required:
+        - type
+        - previousStatus
+        - newStatus
+      properties:
+        type:
+          type: string
+          enum:
+            - issue_status_changed
+        previousStatus:
+          $ref: "#/components/schemas/IssueStatus"
+        newStatus:
+          $ref: "#/components/schemas/IssueStatus"
+    RepositoryItemPullRequestStatusChangedTimelinePayload:
+      type: object
+      required:
+        - type
+        - previousStatus
+        - newStatus
+      properties:
+        type:
+          type: string
+          enum:
+            - pull_request_status_changed
+        previousStatus:
+          $ref: "#/components/schemas/PullRequestStatus"
+        newStatus:
+          $ref: "#/components/schemas/PullRequestStatus"
     RepositoryVisibility:
       type: string
       enum:
