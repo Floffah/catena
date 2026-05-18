@@ -8,4 +8,4 @@ generate:
   client: true
 output-options:
   response-type-suffix: ClientResponse
-
+  skip-prune: true
