@@ -90,19 +90,17 @@ func (s *Server) UpdateAuthenticatedUser(ctx context.Context, request UpdateAuth
 		return UpdateAuthenticatedUser200JSONResponse(response), nil
 	}
 
-	displayName := user.DisplayName
 	trimmedDisplayName := strings.TrimSpace(*request.Body.DisplayName)
 	if trimmedDisplayName == "" {
 		return UpdateAuthenticatedUser400JSONResponse{
 			BadRequestJSONResponse: BadRequestJSONResponse{Error: "displayName must not be empty"},
 		}, nil
 	}
-	displayName = &trimmedDisplayName
 
 	user, err = s.repository.UpdateUserProfile(ctx, db.UpdateUserProfileParams{
 		ID:          user.ID,
 		Name:        user.Name,
-		DisplayName: displayName,
+		DisplayName: &trimmedDisplayName,
 		AvatarUrl:   user.AvatarUrl,
 	})
 	if err != nil {

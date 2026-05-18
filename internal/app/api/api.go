@@ -46,6 +46,7 @@ func NewServer(
 	strictServer := NewStrictHandler(&server, []StrictMiddlewareFunc{})
 
 	r := gin.Default()
+	r.Use(httputil.ServerErrorLogger())
 	r.Use(httputil.CorsMiddleware(httputil.CorsConfig{
 		AllowedOrigins: corsAllowedOrigins,
 	}))
