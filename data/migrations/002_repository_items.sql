@@ -18,7 +18,8 @@ create table repository_items
     updated_at       timestamp with time zone not null default now(),
     last_activity_at timestamp with time zone not null default now(),
 
-    constraint repository_items_repository_number_unique unique (repository_id, number)
+    constraint repository_items_repository_number_unique unique (repository_id, number),
+    constraint repository_items_id_kind_unique unique (id, kind)
 );
 
 create trigger repository_items_set_updated_at
@@ -29,8 +30,15 @@ execute function set_updated_at();
 
 create table issues
 (
-    repository_item_id uuid primary key references repository_items (id) on delete cascade,
-    status             issue_status not null default 'open'
+    repository_item_id uuid primary key,
+    kind               repository_item_kind not null default 'issue', -- for item kind constraint, should never be touched by application code
+    status             issue_status         not null default 'open',
+
+    constraint issues_kind_issue check (kind = 'issue'),
+    constraint issues_repository_item_fk
+        foreign key (repository_item_id, kind)
+            references repository_items (id, kind)
+            on delete cascade
 );
 
 create table labels
@@ -43,6 +51,7 @@ create table labels
     created_at    timestamp with time zone not null default now(),
     updated_at    timestamp with time zone not null default now(),
 
+    constraint labels_name_lowercase_check check (name = lower(name)),
     constraint labels_repository_name_unique unique (repository_id, name)
 );
 

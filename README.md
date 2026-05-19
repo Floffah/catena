@@ -72,6 +72,7 @@ in rough order of priority:
 - [ ] Error tracking [FR-048]
 - [ ] `catenarc` repository configuration [FR-020]
 - [ ] Push-based repository creation [FR-021]
+- [ ] Mail-in patch support for pull requests [FR-049]
 - [ ] Fork support [FR-022]
 - [ ] AI pull request review [FR-023]
 - [ ] Agent task offload [FR-024]
@@ -150,6 +151,7 @@ In no order. Features marked with \* are differentiating features. All of these 
 - **FR-046** Provide metrics, analytics, and observability.
 - **FR-047** Provide rate limiting.
 - **FR-048** Provide error tracking.
+- **FR 049** \* Support mail-in patches (formatted manually via `git diff` OR automatically via `git format-patch`) for repositories to open pull requests.
 
 ## Deployment
 

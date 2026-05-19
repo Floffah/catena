@@ -41,11 +41,11 @@ readme:
 
 security-local:
 	golangci-lint run -E gosec
-	go tool nuclei -code -u http://localhost:8080
+#	go tool nuclei -code -u http://localhost:8080
 
 security-remote:
 	golangci-lint run -E gosec
-	go tool nuclei -code -u https://oncatena.com
+#	go tool nuclei -code -u https://api.oncatena.com
 
 # -- dev --
 

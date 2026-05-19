@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/floffah/catena/internal/pkg/db"
+	"github.com/floffah/catena/internal/pkg/repositoryitems"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -69,8 +70,83 @@ func GitAccessTokenToAPI(token db.GitAccessToken) (GitAccessToken, error) {
 	}, nil
 }
 
+func IssueToAPI(repository db.Repository, item db.RepositoryItem, status db.IssueStatus) (Issue, error) {
+	id, err := uuid.FromBytes(item.ID.Bytes[:])
+	if err != nil {
+		return Issue{}, err
+	}
+
+	repositoryID, err := uuid.FromBytes(item.RepositoryID.Bytes[:])
+	if err != nil {
+		return Issue{}, err
+	}
+
+	authorID, err := nullableUUIDPtr(item.AuthorID)
+	if err != nil {
+		return Issue{}, err
+	}
+
+	return Issue{
+		AuthorId:       authorID,
+		Body:           item.Body,
+		CreatedAt:      item.CreatedAt.Time,
+		Id:             id,
+		Kind:           IssueKindIssue,
+		LastActivityAt: item.LastActivityAt.Time,
+		Number:         item.Number,
+		Reference:      repositoryitems.Reference(repository, item),
+		RepositoryId:   repositoryID,
+		Status:         IssueStatus(status),
+		Title:          item.Title,
+		UpdatedAt:      item.UpdatedAt.Time,
+	}, nil
+}
+
+func GetIssueByRepositoryAndNumberRowToAPI(repository db.Repository, row db.GetIssueByRepositoryAndNumberRow) (Issue, error) {
+	return IssueToAPI(repository, db.RepositoryItem{
+		ID:             row.ID,
+		RepositoryID:   row.RepositoryID,
+		Number:         row.Number,
+		Kind:           row.Kind,
+		Title:          row.Title,
+		Body:           row.Body,
+		AuthorID:       row.AuthorID,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		LastActivityAt: row.LastActivityAt,
+	}, row.Status)
+}
+
+func ListIssuesByRepositoryRowToAPI(repository db.Repository, row db.ListIssuesByRepositoryRow) (Issue, error) {
+	return IssueToAPI(repository, db.RepositoryItem{
+		ID:             row.ID,
+		RepositoryID:   row.RepositoryID,
+		Number:         row.Number,
+		Kind:           row.Kind,
+		Title:          row.Title,
+		Body:           row.Body,
+		AuthorID:       row.AuthorID,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		LastActivityAt: row.LastActivityAt,
+	}, row.Status)
+}
+
 func UUIDToPgtype(id uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: id, Valid: true}
+}
+
+func nullableUUIDPtr(id pgtype.UUID) (*openapi_types.UUID, error) {
+	if !id.Valid {
+		return nil, nil
+	}
+
+	parsed, err := uuid.FromBytes(id.Bytes[:])
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
 }
 
 func timestampPtr(ts pgtype.Timestamptz) *time.Time {

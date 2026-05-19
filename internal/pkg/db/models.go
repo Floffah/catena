@@ -155,6 +155,7 @@ type GitAccessToken struct {
 
 type Issue struct {
 	RepositoryItemID pgtype.UUID
+	Kind             RepositoryItemKind
 	Status           IssueStatus
 }
 

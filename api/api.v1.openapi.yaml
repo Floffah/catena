@@ -301,6 +301,120 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}/issues":
+    get:
+      tags:
+        - v1
+      summary: List Repository Issues
+      description: List issues for a repository. Public repository issues can be listed without authentication.
+      operationId: listRepositoryIssues
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListIssuesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      tags:
+        - v1
+      summary: Create Repository Issue
+      description: Create an issue in a repository.
+      operationId: createRepositoryIssue
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIssueRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}/issues/{number}":
+    get:
+      tags:
+        - v1
+      summary: Get Repository Issue
+      description: Retrieve an issue by repository item number. Public repository issues can be retrieved without authentication.
+      operationId: getRepositoryIssue
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: number
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/repositories/{owner}/{repository}/readme":
     get:
       tags:
@@ -742,13 +856,37 @@ components:
       enum:
         - issue
         - pull_request
+    CreateIssueRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+          nullable: true
+    ListIssuesResponse:
+      type: object
+      required:
+        - issues
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/Issue"
     Issue:
       allOf:
         - $ref: "#/components/schemas/RepositoryItem"
         - type: object
           required:
+            - kind
             - status
           properties:
+            kind:
+              type: string
+              enum:
+                - issue
             status:
               $ref: "#/components/schemas/IssueStatus"
     IssueStatus:

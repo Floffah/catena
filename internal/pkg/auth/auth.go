@@ -178,10 +178,9 @@ func (s *AuthService) Middleware() gin.HandlerFunc {
 }
 
 func (s *AuthService) CreateClerkSignInToken(auth *Auth) (string, error) {
-	expiresInSeconds := int64(20)
 	signInToken, err := s.ClerkSignInToken.Create(context.Background(), &signintoken.CreateParams{
 		UserID:           &auth.ClerkUserID,
-		ExpiresInSeconds: &expiresInSeconds,
+		ExpiresInSeconds: new(int64(20)),
 	})
 	if err != nil {
 		return "", err

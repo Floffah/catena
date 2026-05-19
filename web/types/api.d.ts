@@ -212,6 +212,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{owner}/{repository}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Repository Issues
+         * @description List issues for a repository. Public repository issues can be listed without authentication.
+         */
+        get: operations["listRepositoryIssues"];
+        put?: never;
+        /**
+         * Create Repository Issue
+         * @description Create an issue in a repository.
+         */
+        post: operations["createRepositoryIssue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{owner}/{repository}/issues/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Repository Issue
+         * @description Retrieve an issue by repository item number. Public repository issues can be retrieved without authentication.
+         */
+        get: operations["getRepositoryIssue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories/{owner}/{repository}/readme": {
         parameters: {
             query?: never;
@@ -419,7 +463,16 @@ export interface components {
         };
         /** @enum {string} */
         RepositoryItemKind: "issue" | "pull_request";
+        CreateIssueRequest: {
+            title: string;
+            body?: string | null;
+        };
+        ListIssuesResponse: {
+            issues: components["schemas"]["Issue"][];
+        };
         Issue: components["schemas"]["RepositoryItem"] & {
+            /** @enum {string} */
+            kind: "issue";
             status: components["schemas"]["IssueStatus"];
         };
         /** @enum {string} */
@@ -690,6 +743,10 @@ export type SchemaRepository = components["schemas"]["Repository"];
 export type SchemaRepositoryItem = components["schemas"]["RepositoryItem"];
 export type SchemaRepositoryItemKind =
     components["schemas"]["RepositoryItemKind"];
+export type SchemaCreateIssueRequest =
+    components["schemas"]["CreateIssueRequest"];
+export type SchemaListIssuesResponse =
+    components["schemas"]["ListIssuesResponse"];
 export type SchemaIssue = components["schemas"]["Issue"];
 export type SchemaIssueStatus = components["schemas"]["IssueStatus"];
 export type SchemaPullRequestStatus =
@@ -1025,6 +1082,91 @@ export interface operations {
                     "application/json": components["schemas"]["Repository"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listRepositoryIssues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListIssuesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createRepositoryIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIssueRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getRepositoryIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
