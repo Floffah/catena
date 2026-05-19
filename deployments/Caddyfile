@@ -1,0 +1,28 @@
+:{$PORT} {
+	@www host www.{$CATENA_DOMAIN}
+	handle @www {
+		redir https://{$CATENA_DOMAIN}{uri} temporary
+	}
+
+	encode zstd gzip
+
+	@api path /v1/* /docs
+	handle @api {
+		reverse_proxy {$CATENA_API_UPSTREAM}
+	}
+
+	@git path_regexp git ^/[^/]+/[^/]+/(info/refs|git-upload-pack|git-receive-pack)$
+	handle @git {
+		reverse_proxy {$CATENA_API_UPSTREAM} {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy {$CATENA_WEB_UPSTREAM} {
+			header_up Host {upstream_hostport}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto https
+		}
+	}
+}

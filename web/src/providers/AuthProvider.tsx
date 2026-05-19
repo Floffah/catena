@@ -1,10 +1,10 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useQuery } from "@tanstack/react-query";
+import { Middleware } from "openapi-fetch";
 import { PropsWithChildren, createContext, useContext, useEffect } from "react";
 
-import { setAuthToken } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface AuthContextValue {
     isLoading: boolean;
@@ -14,39 +14,32 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>(null!);
 
 export default function AuthProvider({ children }: PropsWithChildren) {
-    const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
-
-    const getTokenQuery = useQuery({
-        queryKey: ["AuthProvider", "getToken", sessionId],
-        queryFn: async ({ client }) => {
-            if (!isLoaded || !isSignedIn) {
-                setAuthToken(null);
-                return null;
-            }
-
-            const newToken = await getToken();
-            setAuthToken(newToken);
-
-            client.refetchQueries({
-                predicate: (query) => !!query.meta?.refetchOnAuth,
-            });
-
-            return newToken;
-        },
-        enabled: isLoaded && isSignedIn,
-    });
-
-    const isLoading = !isLoaded || (isSignedIn && getTokenQuery.isPending);
-    const isAuthenticated = !!isSignedIn && !!getTokenQuery.data;
+    const { getToken, isLoaded, isSignedIn } = useAuth();
 
     useEffect(() => {
-        if (isLoaded && !isSignedIn) {
-            setAuthToken(null);
-        }
-    }, [isLoaded, isSignedIn]);
+        const authMiddleware: Middleware = {
+            async onRequest({ request }) {
+                const token = await getToken();
+
+                if (token) {
+                    request.headers.set("Authorization", `Bearer ${token}`);
+                }
+
+                return request;
+            },
+        };
+
+        apiFetch.use(authMiddleware);
+
+        return () => {
+            apiFetch.eject(authMiddleware);
+        };
+    }, [getToken]);
 
     return (
-        <AuthContext.Provider value={{ isLoading, isAuthenticated }}>
+        <AuthContext.Provider
+            value={{ isLoading: !isLoaded, isAuthenticated: !!isSignedIn }}
+        >
             {children}
         </AuthContext.Provider>
     );

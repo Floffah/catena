@@ -400,6 +400,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
       responses:
         "200":
           description: OK
@@ -834,6 +835,8 @@ components:
           $ref: "#/components/schemas/RepositoryItemKind"
         title:
           type: string
+          minLength: 1
+          pattern: '.*\S.*'
         body:
           type: string
           nullable: true

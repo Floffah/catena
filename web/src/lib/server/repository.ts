@@ -5,7 +5,7 @@ import { authenticateApiClient } from "@/lib/server/auth";
 import { SchemaRepositoryRefType } from "@/types/api";
 
 export const serverGetRepository = cache(
-    async (owner: string, repository: string) => {
+    async (ownerName: string, repoName: string) => {
         await authenticateApiClient();
 
         const res = await apiFetch.GET(
@@ -13,8 +13,8 @@ export const serverGetRepository = cache(
             {
                 params: {
                     path: {
-                        owner,
-                        repository,
+                        owner: ownerName,
+                        repository: repoName,
                     },
                 },
             },
@@ -25,7 +25,7 @@ export const serverGetRepository = cache(
 );
 
 export const serverGetRepositoryReadme = cache(
-    async (owner: string, repository: string, ref = "main", path = "/") => {
+    async (ownerName: string, repoName: string, ref = "main", path = "/") => {
         await authenticateApiClient();
 
         const res = await apiFetch.GET(
@@ -33,8 +33,8 @@ export const serverGetRepositoryReadme = cache(
             {
                 params: {
                     path: {
-                        owner,
-                        repository,
+                        owner: ownerName,
+                        repository: repoName,
                     },
                     query: {
                         path,
@@ -49,7 +49,7 @@ export const serverGetRepositoryReadme = cache(
 );
 
 export const serverGetRepositoryTree = cache(
-    async (owner: string, repository: string, ref = "main", path = "/") => {
+    async (ownerName: string, repoName: string, ref = "main", path = "/") => {
         await authenticateApiClient();
 
         const res = await apiFetch.GET(
@@ -57,8 +57,8 @@ export const serverGetRepositoryTree = cache(
             {
                 params: {
                     path: {
-                        owner,
-                        repository,
+                        owner: ownerName,
+                        repository: repoName,
                     },
                     query: {
                         ref,
@@ -73,7 +73,7 @@ export const serverGetRepositoryTree = cache(
 );
 
 export const serverGetRepositoryLatestCommit = cache(
-    async (owner: string, repository: string, ref = "main", path = "/") => {
+    async (ownerName: string, repoName: string, ref = "main", path = "/") => {
         await authenticateApiClient();
 
         const res = await apiFetch.GET(
@@ -81,8 +81,8 @@ export const serverGetRepositoryLatestCommit = cache(
             {
                 params: {
                     path: {
-                        owner,
-                        repository,
+                        owner: ownerName,
+                        repository: repoName,
                     },
                     query: {
                         ref,
@@ -97,7 +97,7 @@ export const serverGetRepositoryLatestCommit = cache(
 );
 
 export const serverResolveRepositoryGitPath = cache(
-    async (owner: string, repository: string, path: string) => {
+    async (ownerName: string, repoName: string, path: string) => {
         await authenticateApiClient();
 
         const res = await apiFetch.GET(
@@ -105,8 +105,8 @@ export const serverResolveRepositoryGitPath = cache(
             {
                 params: {
                     path: {
-                        owner,
-                        repository,
+                        owner: ownerName,
+                        repository: repoName,
                     },
                     query: {
                         path,
@@ -121,8 +121,8 @@ export const serverResolveRepositoryGitPath = cache(
 
 export const serverListRepositoryRefs = cache(
     async (
-        owner: string,
-        repository: string,
+        ownerName: string,
+        repoName: string,
         type: SchemaRepositoryRefType = "branch",
     ) => {
         await authenticateApiClient();
@@ -132,8 +132,8 @@ export const serverListRepositoryRefs = cache(
             {
                 params: {
                     path: {
-                        owner,
-                        repository,
+                        owner: ownerName,
+                        repository: repoName,
                     },
                     query: {
                         type,
@@ -143,5 +143,43 @@ export const serverListRepositoryRefs = cache(
         );
 
         return res.data;
+    },
+);
+
+export const serverListRepositoryIssues = cache(
+    async (ownerName: string, repoName: string) => {
+        await authenticateApiClient();
+
+        const res = await apiFetch.GET(
+            "/v1/repositories/{owner}/{repository}/issues",
+            {
+                params: {
+                    path: {
+                        owner: ownerName,
+                        repository: repoName,
+                    },
+                },
+            },
+        );
+
+        return res.data;
+    },
+);
+
+export const serverGetCurrentRepositoryRef = cache(
+    async (ownerName: string, repoName: string, path: string) => {
+        const repo = await serverGetRepository(ownerName, repoName);
+
+        if (repo) {
+            const resolvedPath = await serverResolveRepositoryGitPath(
+                ownerName,
+                repoName,
+                path,
+            );
+
+            return resolvedPath?.ref;
+        }
+
+        return undefined;
     },
 );

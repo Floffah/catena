@@ -130,7 +130,7 @@ func (s *Server) CreateRepositoryIssue(ctx context.Context, request CreateReposi
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		return CreateRepositoryIssue500JSONResponse{
-			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to create issue"},
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: err.Error()},
 		}, nil
 	}
 

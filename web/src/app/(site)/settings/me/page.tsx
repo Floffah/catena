@@ -1,7 +1,7 @@
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 
-import ProfileSettings from "@/app/(site)/settings/me/ProfileSettings";
+import ProfileSettings from "@/components/views/ProfileSettings";
 import { $api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { serverGetCurrentUser } from "@/lib/server/users";

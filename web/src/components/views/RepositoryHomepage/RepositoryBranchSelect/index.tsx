@@ -3,23 +3,23 @@ import { serverListRepositoryRefs } from "@/lib/server/repository";
 
 export default async function RepositoryBranchSelect({
     ownerName,
-    repositoryName,
+    repoName,
     currentRef,
 }: {
     ownerName: string;
-    repositoryName: string;
+    repoName: string;
     currentRef: string;
 }) {
     const availableRefs = await serverListRepositoryRefs(
         ownerName,
-        repositoryName,
+        repoName,
         "branch",
     );
 
     return (
         <RepositoryBranchSelectInner
             ownerName={ownerName}
-            repositoryName={repositoryName}
+            repoName={repoName}
             currentRef={currentRef}
             availableBranches={availableRefs?.refs.map((ref) => ref.name)}
         />

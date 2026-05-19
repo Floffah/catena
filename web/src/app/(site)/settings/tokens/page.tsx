@@ -3,7 +3,7 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import PersonalAccessTokenList from "@/app/(site)/settings/tokens/PersonalAccessTokenList";
+import PersonalAccessTokenList from "@/components/blocks/PersonalAccessTokenList";
 import { Button } from "@/components/ui/button";
 import { $api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";

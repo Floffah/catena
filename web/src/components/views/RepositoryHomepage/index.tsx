@@ -5,31 +5,31 @@ import { RepositoryFileList } from "./RepositoryFileList";
 import { RepositoryReadme } from "./RepositoryReadme";
 
 export default async function RepositoryHomepage({
-    authorName,
+    ownerName,
     repoName,
-    branch,
+    currentRef,
 }: {
-    authorName: string;
+    ownerName: string;
     repoName: string;
-    branch: string;
+    currentRef: string;
 }) {
     return (
         <main className="flex gap-4">
             <div className="flex flex-1 flex-col gap-4">
                 <RepositoryReadme
-                    ownerName={authorName}
-                    repositoryName={repoName}
-                    branch={branch}
+                    ownerName={ownerName}
+                    repoName={repoName}
+                    currentRef={currentRef}
                 />
                 <Suspense fallback={null}>
                     <RepositoryFileList
-                        ownerName={authorName}
-                        repositoryName={repoName}
-                        branch={branch}
+                        ownerName={ownerName}
+                        repoName={repoName}
+                        currentRef={currentRef}
                     />
                 </Suspense>
             </div>
-            <RepositoryAside ownerName={authorName} repositoryName={repoName} />
+            <RepositoryAside ownerName={ownerName} repoName={repoName} />
         </main>
     );
 }

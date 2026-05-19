@@ -7,7 +7,7 @@ import ProfileDropdownButton from "@/components/blocks/Navbar/ProfileDropdownBut
 
 export default async function Navbar() {
     return (
-        <nav className="w-full border-b">
+        <nav className="w-full border-b peer-data-displaces-nav:border-b-transparent next-peer-data-displaces-nav:border-b-transparent">
             <div className="container mx-auto flex items-center justify-between px-8 py-4">
                 <h1 className="text-lg font-bold">
                     <Link href="/home">Catena</Link>

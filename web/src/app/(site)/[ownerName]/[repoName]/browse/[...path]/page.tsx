@@ -8,14 +8,14 @@ export default async function Page({
     params,
 }: {
     params: Promise<{
-        authorName: string;
+        ownerName: string;
         repoName: string;
         path: string[];
     }>;
 }) {
-    const { authorName, repoName, path } = await params;
+    const { ownerName, repoName, path } = await params;
     const resolvedPath = await serverResolveRepositoryGitPath(
-        authorName,
+        ownerName,
         repoName,
         path.join("/"),
     );
@@ -28,7 +28,7 @@ export default async function Page({
         if (resolvedPath.pathType === "tree") {
             return (
                 <RepositorySubTree
-                    authorName={authorName}
+                    ownerName={ownerName}
                     repoName={repoName}
                     branch={resolvedPath.ref}
                     path={resolvedPath.path}
@@ -41,9 +41,9 @@ export default async function Page({
 
     return (
         <RepositoryHomepage
-            authorName={authorName}
+            ownerName={ownerName}
             repoName={repoName}
-            branch={resolvedPath.ref}
+            currentRef={resolvedPath.ref}
         />
     );
 }

@@ -1,5 +1,9 @@
 name: catena-dev
 
+# This file currently only holds SUPPORTING services for development. It will not run the entirety of Catena.
+
+# TODO: add another compose config that runs the entire stack
+
 services:
   db:
     profiles:

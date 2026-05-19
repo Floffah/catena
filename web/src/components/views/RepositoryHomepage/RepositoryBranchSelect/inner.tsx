@@ -15,12 +15,12 @@ import {
 
 export default function RepositoryBranchSelectInner({
     ownerName,
-    repositoryName,
+    repoName,
     currentRef,
     availableBranches,
 }: {
     ownerName: string;
-    repositoryName: string;
+    repoName: string;
     currentRef: string;
     availableBranches?: string[];
 }) {
@@ -44,7 +44,7 @@ export default function RepositoryBranchSelectInner({
             <DropdownMenuContent>
                 <DropdownMenuGroup>
                     {availableBranches.map((branch) => {
-                        const pathBase = `/${ownerName}/${repositoryName}/browse`;
+                        const pathBase = `/${ownerName}/${repoName}/browse`;
                         let href = `${pathBase}/${branch}`;
 
                         if (browsePath) {

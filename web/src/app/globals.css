@@ -138,3 +138,14 @@
         @apply font-sans;
     }
 }
+
+@custom-variant data-displaces-nav {
+    &:where([data-displaces-nav="true"]) {
+        @slot;
+    }
+}
+@custom-variant next-peer-data-displaces-nav {
+    &:has(~ .peer[data-displaces-nav="true"]) {
+        @slot;
+    }
+}
