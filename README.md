@@ -156,8 +156,8 @@ In no order. Features marked with \* are differentiating features. All of these 
 - **FR-046** Provide metrics, analytics, and observability.
 - **FR-047** Provide rate limiting.
 - **FR-048** Provide error tracking.
-- **FR 049** \* Support mail-in patches (formatted manually via `git diff` OR automatically via `git format-patch`) for repositories to open pull requests.
-- **FR 050** Realtime capabilities on issue, pull request, and CI pages.
+- **FR-049** \* Support mail-in patches (formatted manually via `git diff` OR automatically via `git format-patch`) for repositories to open pull requests.
+- **FR-050** Realtime capabilities on issue, pull request, and CI pages.
 
 ## Deployment
 
@@ -173,7 +173,7 @@ Catena currently has two main components:
 
 For the best user experience, the frontend and backend should sit behind a reverse proxy like haproxy, traefik, or our choice: caddy. A Caddyfile is provided in the `deployments` directory for a reference configuration. This is how the official production instance allows user to browse the site at `oncatena.com` and to clone from `https://oncatena.com/author/repo` at the same time.
 
-For deploying all of the above we provide a `frontend`, `api,` and `proxy` Dockerfile in the `deployments` directory. Currently there is no docker compose file to orchestrate these but it's planned for individuals looking to self-host a basic instance.
+For deploying all of the above we provide a `frontend`, `api`, and `proxy` Dockerfile in the `deployments` directory. Currently there is no docker compose file to orchestrate these but it's planned for individuals looking to self-host a basic instance.
 These containers don't rely on any more information than is in the example .env files, except for the variables used in the Caddyfile.
 
 Currently the official production instance is deployed on Railway so a Railway template can be provided in the future. There are very minimal railway configs in the `deployments` directory but they are not currently sufficient for a full deployment, but will need extra environment configuration and volume mounting setup to work properly. 

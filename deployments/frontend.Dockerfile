@@ -17,6 +17,7 @@ ENV PORT=8080
 
 #COPY --from=builder /app/web/public ./public
 COPY --from=builder /app/web/.next ./.next
+USER bun
 
 EXPOSE 8080
 

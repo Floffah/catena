@@ -1,26 +1,31 @@
 import { auth } from "@clerk/nextjs/server";
-import { Middleware } from "openapi-fetch";
+import createFetchClient from "openapi-fetch";
 import { cache } from "react";
 
-import { apiFetch } from "@/lib/api";
+import { paths } from "@/types/api";
 
-let serverToken: string | null = null;
+const baseUrl =
+    process.env.CATENA_DIRECT_INSTANCE_URL ||
+    process.env.NEXT_PUBLIC_CATENA_INSTANCE_URL ||
+    "http://localhost:8080";
 
-const serverAuthMiddleware: Middleware = {
-    async onRequest({ request }) {
-        if (serverToken) {
-            request.headers.set("Authorization", `Bearer ${serverToken}`);
-        }
-
-        return request;
-    },
-};
-apiFetch.use(serverAuthMiddleware);
-
-export const authenticateApiClient = cache(async () => {
+export const serverGetApiClient = cache(async () => {
     const { getToken, isAuthenticated } = await auth();
+    const token = isAuthenticated ? await getToken() : null;
 
-    if (isAuthenticated) {
-        serverToken = await getToken();
+    const apiClient = createFetchClient<paths>({
+        baseUrl,
+    });
+
+    if (token) {
+        apiClient.use({
+            async onRequest({ request }) {
+                request.headers.set("Authorization", `Bearer ${token}`);
+
+                return request;
+            },
+        });
     }
+
+    return apiClient;
 });

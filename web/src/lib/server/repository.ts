@@ -1,14 +1,13 @@
 import { cache } from "react";
 
-import { apiFetch } from "@/lib/api";
-import { authenticateApiClient } from "@/lib/server/auth";
+import { serverGetApiClient } from "@/lib/server/auth";
 import { SchemaRepositoryRefType } from "@/types/api";
 
 export const serverGetRepository = cache(
     async (ownerName: string, repoName: string) => {
-        await authenticateApiClient();
+        const apiClient = await serverGetApiClient();
 
-        const res = await apiFetch.GET(
+        const res = await apiClient.GET(
             "/v1/repositories/{owner}/{repository}",
             {
                 params: {
@@ -26,9 +25,9 @@ export const serverGetRepository = cache(
 
 export const serverGetRepositoryReadme = cache(
     async (ownerName: string, repoName: string, ref = "main", path = "/") => {
-        await authenticateApiClient();
+        const apiClient = await serverGetApiClient();
 
-        const res = await apiFetch.GET(
+        const res = await apiClient.GET(
             "/v1/repositories/{owner}/{repository}/readme",
             {
                 params: {
@@ -50,9 +49,9 @@ export const serverGetRepositoryReadme = cache(
 
 export const serverGetRepositoryTree = cache(
     async (ownerName: string, repoName: string, ref = "main", path = "/") => {
-        await authenticateApiClient();
+        const apiClient = await serverGetApiClient();
 
-        const res = await apiFetch.GET(
+        const res = await apiClient.GET(
             "/v1/repositories/{owner}/{repository}/tree",
             {
                 params: {
@@ -74,9 +73,9 @@ export const serverGetRepositoryTree = cache(
 
 export const serverGetRepositoryLatestCommit = cache(
     async (ownerName: string, repoName: string, ref = "main", path = "/") => {
-        await authenticateApiClient();
+        const apiClient = await serverGetApiClient();
 
-        const res = await apiFetch.GET(
+        const res = await apiClient.GET(
             "/v1/repositories/{owner}/{repository}/latest-commit",
             {
                 params: {
@@ -98,9 +97,9 @@ export const serverGetRepositoryLatestCommit = cache(
 
 export const serverResolveRepositoryGitPath = cache(
     async (ownerName: string, repoName: string, path: string) => {
-        await authenticateApiClient();
+        const apiClient = await serverGetApiClient();
 
-        const res = await apiFetch.GET(
+        const res = await apiClient.GET(
             "/v1/repositories/{owner}/{repository}/git-path/resolve",
             {
                 params: {
@@ -125,9 +124,9 @@ export const serverListRepositoryRefs = cache(
         repoName: string,
         type: SchemaRepositoryRefType = "branch",
     ) => {
-        await authenticateApiClient();
+        const apiClient = await serverGetApiClient();
 
-        const res = await apiFetch.GET(
+        const res = await apiClient.GET(
             "/v1/repositories/{owner}/{repository}/refs",
             {
                 params: {
@@ -148,9 +147,9 @@ export const serverListRepositoryRefs = cache(
 
 export const serverListRepositoryIssues = cache(
     async (ownerName: string, repoName: string) => {
-        await authenticateApiClient();
+        const apiClient = await serverGetApiClient();
 
-        const res = await apiFetch.GET(
+        const res = await apiClient.GET(
             "/v1/repositories/{owner}/{repository}/issues",
             {
                 params: {

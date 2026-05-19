@@ -1,4 +1,4 @@
-import createFetchClient, { Middleware } from "openapi-fetch";
+import createFetchClient from "openapi-fetch";
 import createQueryClient from "openapi-react-query";
 
 import { useCatenaAuth } from "@/providers/AuthProvider";

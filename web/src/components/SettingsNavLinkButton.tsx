@@ -17,7 +17,7 @@ export default function SettingsNavLinkButton({
 
     return (
         <Button
-            variant={pathname === href ? "outline" : "ghost"}
+            variant={pathname.startsWith(href) ? "outline" : "ghost"}
             asChild
             className={cn("justify-start", className)}
             {...props}

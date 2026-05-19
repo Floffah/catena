@@ -1,4 +1,5 @@
 import { type VariantProps, cva } from "class-variance-authority";
+import { Slot } from "radix-ui";
 
 import { cn } from "@/lib/utils";
 
@@ -71,9 +72,15 @@ function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
     );
 }
 
-function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
+function EmptyDescription({
+    className,
+    asChild,
+    ...props
+}: React.ComponentProps<"p"> & { asChild?: boolean }) {
+    const Comp = asChild ? Slot.Root : "p";
+
     return (
-        <div
+        <Comp
             data-slot="empty-description"
             className={cn(
                 "text-xs/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
