@@ -2,7 +2,13 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { Middleware } from "openapi-fetch";
-import { PropsWithChildren, createContext, useContext, useEffect } from "react";
+import {
+    PropsWithChildren,
+    createContext,
+    useContext,
+    useLayoutEffect,
+    useRef,
+} from "react";
 
 import { apiFetch } from "@/lib/api";
 
@@ -15,11 +21,16 @@ const AuthContext = createContext<AuthContextValue>(null!);
 
 export default function AuthProvider({ children }: PropsWithChildren) {
     const { getToken, isLoaded, isSignedIn } = useAuth();
+    const getTokenRef = useRef(getToken);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
+        getTokenRef.current = getToken;
+    }, [getToken]);
+
+    useLayoutEffect(() => {
         const authMiddleware: Middleware = {
             async onRequest({ request }) {
-                const token = await getToken();
+                const token = await getTokenRef.current();
 
                 if (token) {
                     request.headers.set("Authorization", `Bearer ${token}`);
@@ -34,11 +45,14 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         return () => {
             apiFetch.eject(authMiddleware);
         };
-    }, [getToken]);
+    }, []);
 
     return (
         <AuthContext.Provider
-            value={{ isLoading: !isLoaded, isAuthenticated: !!isSignedIn }}
+            value={{
+                isLoading: !isLoaded,
+                isAuthenticated: !!isSignedIn,
+            }}
         >
             {children}
         </AuthContext.Provider>

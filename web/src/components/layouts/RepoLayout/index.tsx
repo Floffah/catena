@@ -26,7 +26,7 @@ export default async function RepoLayout({
         >
             <div className="flex border-b">
                 <div className="container mx-auto flex items-end justify-between gap-8 px-8 pb-2">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
                         <h1 className="flex items-center gap-1 text-xl">
                             <IconBrandGit />
                             {repo.ownerName}

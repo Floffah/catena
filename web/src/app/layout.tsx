@@ -2,7 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { shadcn } from "@clerk/ui/themes";
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
-import { Geist, Geist_Mono, Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, JetBrains_Mono } from "next/font/google";
 import { PropsWithChildren } from "react";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -12,7 +12,7 @@ import QueryClientProvider from "@/providers/QueryClientProvider";
 
 import "./globals.css";
 
-const sansFont = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const sansFont = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 const monoFont = JetBrains_Mono({
     variable: "--font-mono",
