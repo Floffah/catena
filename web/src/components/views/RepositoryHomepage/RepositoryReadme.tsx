@@ -6,19 +6,19 @@ import { serverGetRepositoryReadme } from "@/lib/server/repository";
 
 export async function RepositoryReadme({
     ownerName,
-    repositoryName,
-    branch,
+    repoName,
+    currentRef,
     path,
 }: {
     ownerName: string;
-    repositoryName: string;
-    branch?: string;
+    repoName: string;
+    currentRef?: string;
     path?: string;
 }) {
     const readme = await serverGetRepositoryReadme(
         ownerName,
-        repositoryName,
-        branch,
+        repoName,
+        currentRef,
         path,
     );
 

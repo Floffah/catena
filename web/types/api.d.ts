@@ -212,6 +212,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{owner}/{repository}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Repository Issues
+         * @description List issues for a repository. Public repository issues can be listed without authentication.
+         */
+        get: operations["listRepositoryIssues"];
+        put?: never;
+        /**
+         * Create Repository Issue
+         * @description Create an issue in a repository.
+         */
+        post: operations["createRepositoryIssue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/repositories/{owner}/{repository}/issues/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Repository Issue
+         * @description Retrieve an issue by repository item number. Public repository issues can be retrieved without authentication.
+         */
+        get: operations["getRepositoryIssue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories/{owner}/{repository}/readme": {
         parameters: {
             query?: never;
@@ -393,6 +437,152 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        RepositoryItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            repositoryId: string;
+            /** Format: int64 */
+            number: number;
+            /** @description User-facing repository item reference, such as `CAT-1`. */
+            reference: string;
+            kind: components["schemas"]["RepositoryItemKind"];
+            title: string;
+            body?: string | null;
+            /**
+             * Format: uuid
+             * @description Null when the author account has been deleted.
+             */
+            authorId: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            lastActivityAt: string;
+        };
+        /** @enum {string} */
+        RepositoryItemKind: "issue" | "pull_request";
+        CreateIssueRequest: {
+            title: string;
+            body?: string | null;
+        };
+        ListIssuesResponse: {
+            issues: components["schemas"]["Issue"][];
+        };
+        Issue: components["schemas"]["RepositoryItem"] & {
+            /** @enum {string} */
+            kind: "issue";
+            status: components["schemas"]["IssueStatus"];
+        };
+        /** @enum {string} */
+        IssueStatus: "open" | "in_progress" | "completed" | "cancelled";
+        /** @enum {string} */
+        PullRequestStatus: "open" | "merged" | "cancelled";
+        Label: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            repositoryId: string;
+            /**
+             * @description Labels are stored in lowercase.
+             * @example bug
+             */
+            name: string;
+            /**
+             * @description Six-digit hexadecimal color prefixed with `#`.
+             * @example #d73a4a
+             */
+            color: string;
+            description?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        RepositoryItemTimelineEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            repositoryItemId: string;
+            /**
+             * Format: uuid
+             * @description Null when the actor account has been deleted.
+             */
+            actorId: string | null;
+            payload: components["schemas"]["RepositoryItemTimelinePayload"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        RepositoryItemTimelinePayload:
+            | components["schemas"]["RepositoryItemCommentTimelinePayload"]
+            | components["schemas"]["RepositoryItemTitleChangedTimelinePayload"]
+            | components["schemas"]["RepositoryItemBodyChangedTimelinePayload"]
+            | components["schemas"]["RepositoryItemLabelsChangedTimelinePayload"]
+            | components["schemas"]["RepositoryItemIssueStatusChangedTimelinePayload"]
+            | components["schemas"]["RepositoryItemPullRequestStatusChangedTimelinePayload"];
+        RepositoryItemCommentTimelinePayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "comment";
+            body: string;
+        };
+        RepositoryItemTitleChangedTimelinePayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "title_changed";
+            previousTitle: string;
+            newTitle: string;
+        };
+        RepositoryItemBodyChangedTimelinePayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "body_changed";
+            /** @description Unified diff of the markdown source body. */
+            diff: string;
+        };
+        RepositoryItemLabelsChangedTimelinePayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "labels_changed";
+            addedLabels: components["schemas"]["RepositoryItemTimelineLabelSnapshot"][];
+            removedLabels: components["schemas"]["RepositoryItemTimelineLabelSnapshot"][];
+        };
+        RepositoryItemTimelineLabelSnapshot: {
+            /** Format: uuid */
+            id: string;
+            /** @description Labels are stored in lowercase. */
+            name: string;
+            color: string;
+        };
+        RepositoryItemIssueStatusChangedTimelinePayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "issue_status_changed";
+            previousStatus: components["schemas"]["IssueStatus"];
+            newStatus: components["schemas"]["IssueStatus"];
+        };
+        RepositoryItemPullRequestStatusChangedTimelinePayload: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "pull_request_status_changed";
+            previousStatus: components["schemas"]["PullRequestStatus"];
+            newStatus: components["schemas"]["PullRequestStatus"];
+        };
         /**
          * @default private
          * @enum {string}
@@ -550,6 +740,36 @@ export type SchemaCreateRepositoryResponse =
 export type SchemaError = components["schemas"]["Error"];
 export type SchemaGitAccessToken = components["schemas"]["GitAccessToken"];
 export type SchemaRepository = components["schemas"]["Repository"];
+export type SchemaRepositoryItem = components["schemas"]["RepositoryItem"];
+export type SchemaRepositoryItemKind =
+    components["schemas"]["RepositoryItemKind"];
+export type SchemaCreateIssueRequest =
+    components["schemas"]["CreateIssueRequest"];
+export type SchemaListIssuesResponse =
+    components["schemas"]["ListIssuesResponse"];
+export type SchemaIssue = components["schemas"]["Issue"];
+export type SchemaIssueStatus = components["schemas"]["IssueStatus"];
+export type SchemaPullRequestStatus =
+    components["schemas"]["PullRequestStatus"];
+export type SchemaLabel = components["schemas"]["Label"];
+export type SchemaRepositoryItemTimelineEntry =
+    components["schemas"]["RepositoryItemTimelineEntry"];
+export type SchemaRepositoryItemTimelinePayload =
+    components["schemas"]["RepositoryItemTimelinePayload"];
+export type SchemaRepositoryItemCommentTimelinePayload =
+    components["schemas"]["RepositoryItemCommentTimelinePayload"];
+export type SchemaRepositoryItemTitleChangedTimelinePayload =
+    components["schemas"]["RepositoryItemTitleChangedTimelinePayload"];
+export type SchemaRepositoryItemBodyChangedTimelinePayload =
+    components["schemas"]["RepositoryItemBodyChangedTimelinePayload"];
+export type SchemaRepositoryItemLabelsChangedTimelinePayload =
+    components["schemas"]["RepositoryItemLabelsChangedTimelinePayload"];
+export type SchemaRepositoryItemTimelineLabelSnapshot =
+    components["schemas"]["RepositoryItemTimelineLabelSnapshot"];
+export type SchemaRepositoryItemIssueStatusChangedTimelinePayload =
+    components["schemas"]["RepositoryItemIssueStatusChangedTimelinePayload"];
+export type SchemaRepositoryItemPullRequestStatusChangedTimelinePayload =
+    components["schemas"]["RepositoryItemPullRequestStatusChangedTimelinePayload"];
 export type SchemaRepositoryVisibility =
     components["schemas"]["RepositoryVisibility"];
 export type SchemaListRepositoryRefsResponse =
@@ -862,6 +1082,91 @@ export interface operations {
                     "application/json": components["schemas"]["Repository"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listRepositoryIssues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListIssuesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createRepositoryIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIssueRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getRepositoryIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];

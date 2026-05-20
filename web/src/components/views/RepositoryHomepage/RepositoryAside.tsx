@@ -8,14 +8,14 @@ import {
 
 export default async function RepositoryAside({
     ownerName,
-    repositoryName,
+    repoName,
 }: {
     ownerName: string;
-    repositoryName: string;
+    repoName: string;
 }) {
     const [repo, latestCommit] = await Promise.all([
-        serverGetRepository(ownerName, repositoryName),
-        serverGetRepositoryLatestCommit(ownerName, repositoryName),
+        serverGetRepository(ownerName, repoName),
+        serverGetRepositoryLatestCommit(ownerName, repoName),
     ]);
 
     return (

@@ -1,10 +1,16 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useQuery } from "@tanstack/react-query";
-import { PropsWithChildren, createContext, useContext, useEffect } from "react";
+import { Middleware } from "openapi-fetch";
+import {
+    PropsWithChildren,
+    createContext,
+    useContext,
+    useLayoutEffect,
+    useRef,
+} from "react";
 
-import { setAuthToken } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface AuthContextValue {
     isLoading: boolean;
@@ -14,39 +20,40 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>(null!);
 
 export default function AuthProvider({ children }: PropsWithChildren) {
-    const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
+    const { getToken, isLoaded, isSignedIn } = useAuth();
+    const getTokenRef = useRef(getToken);
 
-    const getTokenQuery = useQuery({
-        queryKey: ["AuthProvider", "getToken", sessionId],
-        queryFn: async ({ client }) => {
-            if (!isLoaded || !isSignedIn) {
-                setAuthToken(null);
-                return null;
-            }
+    useLayoutEffect(() => {
+        getTokenRef.current = getToken;
+    }, [getToken]);
 
-            const newToken = await getToken();
-            setAuthToken(newToken);
+    useLayoutEffect(() => {
+        const authMiddleware: Middleware = {
+            async onRequest({ request }) {
+                const token = await getTokenRef.current();
 
-            client.refetchQueries({
-                predicate: (query) => !!query.meta?.refetchOnAuth,
-            });
+                if (token) {
+                    request.headers.set("Authorization", `Bearer ${token}`);
+                }
 
-            return newToken;
-        },
-        enabled: isLoaded && isSignedIn,
-    });
+                return request;
+            },
+        };
 
-    const isLoading = !isLoaded || (isSignedIn && getTokenQuery.isPending);
-    const isAuthenticated = !!isSignedIn && !!getTokenQuery.data;
+        apiFetch.use(authMiddleware);
 
-    useEffect(() => {
-        if (isLoaded && !isSignedIn) {
-            setAuthToken(null);
-        }
-    }, [isLoaded, isSignedIn]);
+        return () => {
+            apiFetch.eject(authMiddleware);
+        };
+    }, []);
 
     return (
-        <AuthContext.Provider value={{ isLoading, isAuthenticated }}>
+        <AuthContext.Provider
+            value={{
+                isLoading: !isLoaded,
+                isAuthenticated: !!isSignedIn,
+            }}
+        >
             {children}
         </AuthContext.Provider>
     );

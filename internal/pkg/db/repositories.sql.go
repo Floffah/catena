@@ -25,7 +25,7 @@ insert into repositories (
   $4,
   $5
 )
-returning id, owner_id, name, description, visibility, default_branch, created_at, updated_at
+returning id, owner_id, name, description, visibility, default_branch, created_at, updated_at, item_prefix, next_item_number
 `
 
 type CreateRepositoryParams struct {
@@ -54,6 +54,8 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		&i.DefaultBranch,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ItemPrefix,
+		&i.NextItemNumber,
 	)
 	return i, err
 }
@@ -69,7 +71,7 @@ func (q *Queries) DeleteRepository(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getRepositoryByID = `-- name: GetRepositoryByID :one
-select id, owner_id, name, description, visibility, default_branch, created_at, updated_at from repositories
+select id, owner_id, name, description, visibility, default_branch, created_at, updated_at, item_prefix, next_item_number from repositories
 where id = $1
 `
 
@@ -85,12 +87,14 @@ func (q *Queries) GetRepositoryByID(ctx context.Context, id pgtype.UUID) (Reposi
 		&i.DefaultBranch,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ItemPrefix,
+		&i.NextItemNumber,
 	)
 	return i, err
 }
 
 const getRepositoryByOwnerAndName = `-- name: GetRepositoryByOwnerAndName :one
-select repositories.id, repositories.owner_id, repositories.name, repositories.description, repositories.visibility, repositories.default_branch, repositories.created_at, repositories.updated_at
+select repositories.id, repositories.owner_id, repositories.name, repositories.description, repositories.visibility, repositories.default_branch, repositories.created_at, repositories.updated_at, repositories.item_prefix, repositories.next_item_number
 from repositories
 join users on users.id = repositories.owner_id
 where users.name = $1
@@ -114,6 +118,8 @@ func (q *Queries) GetRepositoryByOwnerAndName(ctx context.Context, arg GetReposi
 		&i.DefaultBranch,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ItemPrefix,
+		&i.NextItemNumber,
 	)
 	return i, err
 }
@@ -126,7 +132,7 @@ set
   visibility = $4,
   default_branch = $5
 where id = $1
-returning id, owner_id, name, description, visibility, default_branch, created_at, updated_at
+returning id, owner_id, name, description, visibility, default_branch, created_at, updated_at, item_prefix, next_item_number
 `
 
 type UpdateRepositoryParams struct {
@@ -155,6 +161,8 @@ func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryPara
 		&i.DefaultBranch,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ItemPrefix,
+		&i.NextItemNumber,
 	)
 	return i, err
 }

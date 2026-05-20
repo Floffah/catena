@@ -1,12 +1,11 @@
 import { cache } from "react";
 
-import { apiFetch } from "@/lib/api";
-import { authenticateApiClient } from "@/lib/server/auth";
+import { serverGetApiClient } from "@/lib/server/auth";
 
 export const serverGetGitAccessTokens = cache(async () => {
-    await authenticateApiClient();
+    const apiClient = await serverGetApiClient();
 
-    const res = await apiFetch.GET("/v1/git-access-tokens");
+    const res = await apiClient.GET("/v1/git-access-tokens");
 
     return res.data;
 });

@@ -2,6 +2,8 @@
 
 Open source modern git server. My attempt at making a GitHub-like system. Catena is experimental for now. The goal is to build a fast, modern, self-hostable social Git platform with a great developer experience and a clean web UI.
 
+The UI currently sucks, my main focus is making it functional and building the core features, but eventually I want to make it look nice too.
+
 Links:
 - [Production Instance](https://www.oncatena.com)
 - [API Docs](https://api.oncatena.com/docs)
@@ -44,6 +46,7 @@ in rough order of priority:
 - [ ] Third-party API and automation surface [FR-019]
 - [ ] CI/CD integration model [FR-014]
 - [ ] First-party CI/pipeline runner [FR-014]
+- [ ] SSE/Realtime CI updates [FR-050]
 - [ ] External CI integrations [FR-015]
 - [ ] External deployment integrations [FR-015]
 - [ ] Status checks [FR-016]
@@ -52,6 +55,8 @@ in rough order of priority:
   - [ ] Changelog generation [FR-036]
   - [ ] Milestone management [FR-036]
   - [ ] Release artifact management [FR-037]
+- [ ] UI Overhaul [FR-006]
+- [ ] SSE/Realtime issues & PR updates [FR-050]
 - [ ] `catena` CLI tool [FR-018]
   - [ ] CLI login [FR-018]
   - [ ] Git credential helper integration [FR-018]
@@ -72,6 +77,7 @@ in rough order of priority:
 - [ ] Error tracking [FR-048]
 - [ ] `catenarc` repository configuration [FR-020]
 - [ ] Push-based repository creation [FR-021]
+- [ ] Mail-in patch support for pull requests [FR-049]
 - [ ] Fork support [FR-022]
 - [ ] AI pull request review [FR-023]
 - [ ] Agent task offload [FR-024]
@@ -150,7 +156,27 @@ In no order. Features marked with \* are differentiating features. All of these 
 - **FR-046** Provide metrics, analytics, and observability.
 - **FR-047** Provide rate limiting.
 - **FR-048** Provide error tracking.
+- **FR-049** \* Support mail-in patches (formatted manually via `git diff` OR automatically via `git format-patch`) for repositories to open pull requests.
+- **FR-050** Realtime capabilities on issue, pull request, and CI pages.
 
 ## Deployment
 
 Catena is not currently production ready. See [CONTRIBUTING.md](CONTRIBUTING.md) if you're interested in contributing or running a development instance.
+
+There are no official templates or deployment paths for self-hosting, but the puzzle pieces do exist.
+
+Catena currently has two main components:
+- The frontend server - next app but also is the main provisioner for auth via Clerk so is currently necessary for login and therefore token management
+- The backend - serves the API and Git http backend
+  - Requires a postgres 18 or above database
+  - Requires a persistent volume (at `/var/lib/catena/git` if using Docker) for storing bare Git repositories
+
+For the best user experience, the frontend and backend should sit behind a reverse proxy like haproxy, traefik, or our choice: caddy. A Caddyfile is provided in the `deployments` directory for a reference configuration. This is how the official production instance allows user to browse the site at `oncatena.com` and to clone from `https://oncatena.com/author/repo` at the same time.
+
+For deploying all of the above we provide a `frontend`, `api`, and `proxy` Dockerfile in the `deployments` directory. Currently there is no docker compose file to orchestrate these but it's planned for individuals looking to self-host a basic instance.
+These containers don't rely on any more information than is in the example .env files, except for the variables used in the Caddyfile.
+
+Currently the official production instance is deployed on Railway so a Railway template can be provided in the future. There are very minimal railway configs in the `deployments` directory but they are not currently sufficient for a full deployment, but will need extra environment configuration and volume mounting setup to work properly. 
+
+An example of a potential railway setup using all of the above components and puzzle pieces is:
+![Example Railway Setup](./assets/railway-diagram.png)

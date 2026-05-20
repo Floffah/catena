@@ -11,6 +11,92 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type IssueStatus string
+
+const (
+	IssueStatusOpen       IssueStatus = "open"
+	IssueStatusInProgress IssueStatus = "in_progress"
+	IssueStatusCompleted  IssueStatus = "completed"
+	IssueStatusCancelled  IssueStatus = "cancelled"
+)
+
+func (e *IssueStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IssueStatus(s)
+	case string:
+		*e = IssueStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IssueStatus: %T", src)
+	}
+	return nil
+}
+
+type NullIssueStatus struct {
+	IssueStatus IssueStatus
+	Valid       bool // Valid is true if IssueStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIssueStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.IssueStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IssueStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIssueStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IssueStatus), nil
+}
+
+type RepositoryItemKind string
+
+const (
+	RepositoryItemKindIssue       RepositoryItemKind = "issue"
+	RepositoryItemKindPullRequest RepositoryItemKind = "pull_request"
+)
+
+func (e *RepositoryItemKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RepositoryItemKind(s)
+	case string:
+		*e = RepositoryItemKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RepositoryItemKind: %T", src)
+	}
+	return nil
+}
+
+type NullRepositoryItemKind struct {
+	RepositoryItemKind RepositoryItemKind
+	Valid              bool // Valid is true if RepositoryItemKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRepositoryItemKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.RepositoryItemKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RepositoryItemKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRepositoryItemKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RepositoryItemKind), nil
+}
+
 type RepositoryVisibility string
 
 const (
@@ -67,15 +153,61 @@ type GitAccessToken struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type Issue struct {
+	RepositoryItemID pgtype.UUID
+	Kind             RepositoryItemKind
+	Status           IssueStatus
+}
+
+type Label struct {
+	ID           pgtype.UUID
+	RepositoryID pgtype.UUID
+	Name         string
+	Color        string
+	Description  *string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
 type Repository struct {
-	ID            pgtype.UUID
-	OwnerID       pgtype.UUID
-	Name          string
-	Description   *string
-	Visibility    RepositoryVisibility
-	DefaultBranch string
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
+	ID             pgtype.UUID
+	OwnerID        pgtype.UUID
+	Name           string
+	Description    *string
+	Visibility     RepositoryVisibility
+	DefaultBranch  string
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+	ItemPrefix     string
+	NextItemNumber int64
+}
+
+type RepositoryItem struct {
+	ID             pgtype.UUID
+	RepositoryID   pgtype.UUID
+	Number         int64
+	Kind           RepositoryItemKind
+	Title          string
+	Body           *string
+	AuthorID       pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+	LastActivityAt pgtype.Timestamptz
+}
+
+type RepositoryItemLabel struct {
+	RepositoryItemID pgtype.UUID
+	LabelID          pgtype.UUID
+	CreatedAt        pgtype.Timestamptz
+}
+
+type RepositoryItemTimeline struct {
+	ID               pgtype.UUID
+	RepositoryItemID pgtype.UUID
+	ActorID          pgtype.UUID
+	Payload          []byte
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
 }
 
 type User struct {

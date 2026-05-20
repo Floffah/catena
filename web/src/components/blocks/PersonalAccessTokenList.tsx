@@ -1,8 +1,15 @@
 "use client";
 
-import { IconTrash } from "@tabler/icons-react";
+import { IconKey, IconTrash } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/button";
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from "@/components/ui/empty";
 import { $api } from "@/lib/api";
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -25,14 +32,25 @@ export default function PersonalAccessTokenList() {
         },
     );
 
+    if (tokens.length === 0) {
+        return (
+            <Empty className="rounded-lg border border-border bg-card">
+                <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                        <IconKey />
+                    </EmptyMedia>
+                    <EmptyTitle>No active personal access tokens</EmptyTitle>
+                    <EmptyDescription>
+                        Create a token when you need to authenticate Git
+                        operations over HTTPS.
+                    </EmptyDescription>
+                </EmptyHeader>
+            </Empty>
+        );
+    }
+
     return (
         <div className="divide-y divide-border overflow-hidden rounded-lg ring-1 ring-foreground/10">
-            {tokens.length === 0 && (
-                <p className="px-4 py-6 text-sm text-muted-foreground">
-                    No active personal access tokens.
-                </p>
-            )}
-
             {tokens.map((token) => (
                 <div
                     key={token.id}

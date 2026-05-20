@@ -18,7 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-//go:generate go tool oapi-codegen -config cfg.yaml ../../../api/api.v1.openapi.yaml
+//go:generate go tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen -config cfg.yaml ../../../api/api.v1.openapi.yaml
 
 type Server struct {
 	repository db.Queries
@@ -81,8 +81,7 @@ func NewServer(
 }
 
 func (s *Server) Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error) {
-	ok := "ok"
-	return Healthz200JSONResponse{Status: &ok}, nil
+	return Healthz200JSONResponse{Status: new("ok")}, nil
 }
 
 func (s *Server) Version(ctx context.Context, request VersionRequestObject) (VersionResponseObject, error) {

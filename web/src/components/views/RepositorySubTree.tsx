@@ -4,12 +4,12 @@ import { RepositoryFileList } from "@/components/views/RepositoryHomepage/Reposi
 import { RepositoryReadme } from "@/components/views/RepositoryHomepage/RepositoryReadme";
 
 export default async function RepositorySubTree({
-    authorName,
+    ownerName,
     repoName,
     branch,
     path,
 }: {
-    authorName: string;
+    ownerName: string;
     repoName: string;
     branch: string;
     path: string;
@@ -18,18 +18,18 @@ export default async function RepositorySubTree({
         <main className="flex flex-col gap-4">
             <Suspense fallback={null}>
                 <RepositoryFileList
-                    ownerName={authorName}
-                    repositoryName={repoName}
-                    branch={branch}
+                    ownerName={ownerName}
+                    repoName={repoName}
+                    currentRef={branch}
                     path={path}
                 />
             </Suspense>
 
             <Suspense fallback={null}>
                 <RepositoryReadme
-                    ownerName={authorName}
-                    repositoryName={repoName}
-                    branch={branch}
+                    ownerName={ownerName}
+                    repoName={repoName}
+                    currentRef={branch}
                     path={path}
                 />
             </Suspense>

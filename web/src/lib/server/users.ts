@@ -1,20 +1,19 @@
 import { cache } from "react";
 
-import { apiFetch } from "@/lib/api";
-import { authenticateApiClient } from "@/lib/server/auth";
+import { serverGetApiClient } from "@/lib/server/auth";
 
 export const serverGetCurrentUser = cache(async () => {
-    await authenticateApiClient();
+    const apiClient = await serverGetApiClient();
 
-    const res = await apiFetch.GET("/v1/user");
+    const res = await apiClient.GET("/v1/user");
 
     return res.data;
 });
 
 export const serverGetUserForClerkID = cache(async (clerkID: string) => {
-    await authenticateApiClient();
+    const apiClient = await serverGetApiClient();
 
-    const res = await apiFetch.GET("/v1/users/clerk/{clerkUserId}", {
+    const res = await apiClient.GET("/v1/users/clerk/{clerkUserId}", {
         params: {
             path: {
                 clerkUserId: clerkID,
@@ -26,9 +25,9 @@ export const serverGetUserForClerkID = cache(async (clerkID: string) => {
 });
 
 export const serverGetUserForName = cache(async (name: string) => {
-    await authenticateApiClient();
+    const apiClient = await serverGetApiClient();
 
-    const res = await apiFetch.GET("/v1/users/name/{name}", {
+    const res = await apiClient.GET("/v1/users/name/{name}", {
         params: {
             path: {
                 name,

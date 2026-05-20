@@ -1,7 +1,7 @@
 import { IconKey, IconSettings, IconUserEdit } from "@tabler/icons-react";
 import { PropsWithChildren } from "react";
 
-import SettingsNavLinkButton from "@/app/(site)/settings/SettingsNavLinkButton";
+import SettingsNavLinkButton from "@/components/SettingsNavLinkButton";
 import UserProfileDialogButton from "@/components/UserProfileDialogButton";
 import { Button } from "@/components/ui/button";
 

@@ -5,7 +5,8 @@ generate:
   gin-server: true
   models: true
   strict-server: true
-  client: true
 output-options:
   response-type-suffix: ClientResponse
-
+  skip-prune: true
+  include-tags:
+    - "v1"

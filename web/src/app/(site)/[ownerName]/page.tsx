@@ -11,11 +11,11 @@ import { serverGetUserForName } from "@/lib/server/users";
 export default async function Page({
     params,
 }: {
-    params: Promise<{ authorName: string }>;
+    params: Promise<{ ownerName: string }>;
 }) {
-    const { authorName } = await params;
+    const { ownerName } = await params;
 
-    const user = await serverGetUserForName(authorName);
+    const user = await serverGetUserForName(ownerName);
 
     if (!user) {
         return notFound();
