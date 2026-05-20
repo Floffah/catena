@@ -16,7 +16,9 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=8080
 
 #COPY --from=builder /app/web/public ./public
-COPY --from=builder /app/web/.next ./.next
+COPY --from=builder --link --chown=bun /app/web/.next ./.next
+COPY --from=builder --link --chown=bun /app/web/.next/static ./next/standalone/web/.next/static
+
 USER bun
 
 EXPOSE 8080
