@@ -165,6 +165,27 @@ export const serverListRepositoryIssues = cache(
     },
 );
 
+export const serverGetRepositoryIssue = cache(
+    async (ownerName: string, repoName: string, number: number) => {
+        const apiClient = await serverGetApiClient();
+
+        const res = await apiClient.GET(
+            "/v1/repositories/{owner}/{repository}/issues/{number}",
+            {
+                params: {
+                    path: {
+                        owner: ownerName,
+                        repository: repoName,
+                        number,
+                    },
+                },
+            },
+        );
+
+        return res.data;
+    },
+);
+
 export const serverGetCurrentRepositoryRef = cache(
     async (ownerName: string, repoName: string, path: string) => {
         const repo = await serverGetRepository(ownerName, repoName);

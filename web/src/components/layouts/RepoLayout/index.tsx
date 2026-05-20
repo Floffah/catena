@@ -36,7 +36,10 @@ export default async function RepoLayout({
                     </div>
 
                     <nav className="flex items-center gap-4">
-                        <RepoNavLink href={`/${repo.ownerName}/${repo.name}`}>
+                        <RepoNavLink
+                            href={`/${repo.ownerName}/${repo.name}`}
+                            exact
+                        >
                             Repository
                         </RepoNavLink>
                         <RepoNavLink
