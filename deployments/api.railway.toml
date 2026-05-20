@@ -1,6 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "deployments/api.Dockerfile"
+watchPatterns = ["cmd/**", "internal/**", "data/**", "api/**", "go.*", "pkg/**"]
 
 [deploy]
 healthcheckPath = "/v1/healthz"

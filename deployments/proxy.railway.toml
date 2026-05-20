@@ -1,6 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "deployments/proxy.Dockerfile"
+watchPatterns = ["deployments/Caddyfile"]
 
 [deploy]
 healthcheckPath = "/"
