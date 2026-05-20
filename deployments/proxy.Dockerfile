@@ -8,5 +8,4 @@ RUN sh /proxy-build.sh
 FROM caddy:alpine
 
 COPY --from=builder /usr/local/bin/caddy-custom /usr/bin/caddy
-COPY ./www /www
 COPY deployments/Caddyfile /etc/caddy/Caddyfile
