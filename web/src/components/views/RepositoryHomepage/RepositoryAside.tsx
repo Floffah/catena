@@ -19,7 +19,7 @@ export default async function RepositoryAside({
     ]);
 
     return (
-        <aside className="flex max-w-80 shrink-0 flex-col gap-4">
+        <aside className="flex shrink-0 flex-col gap-4 lg:max-w-80">
             <section className="flex flex-col gap-1">
                 <h2 className="text-lg font-semibold">About</h2>
                 <p className="text-sm text-muted-foreground">

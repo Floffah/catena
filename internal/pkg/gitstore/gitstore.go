@@ -16,12 +16,15 @@ import (
 )
 
 const maxReadmeBytes = 1024 * 1024
+const maxFileBytes = 1024 * 1024
 
 var (
 	ErrInvalidPath    = errors.New("invalid path")
 	ErrInvalidRef     = errors.New("invalid ref")
 	ErrReadmeNotFound = errors.New("readme not found")
 	ErrReadmeTooLarge = errors.New("readme too large")
+	ErrFileNotFound   = errors.New("file not found")
+	ErrFileTooLarge   = errors.New("file too large")
 	ErrCommitNotFound = errors.New("commit not found")
 	ErrRefNotFound    = errors.New("ref not found")
 	ErrPathNotFound   = errors.New("path not found")
@@ -29,6 +32,16 @@ var (
 )
 
 type Readme struct {
+	Ref       string
+	CommitOID string
+	Path      string
+	Name      string
+	OID       string
+	Size      int64
+	Content   string
+}
+
+type File struct {
 	Ref       string
 	CommitOID string
 	Path      string
@@ -182,6 +195,58 @@ func (s Store) GetReadme(ctx context.Context, dbRepo db.Repository, ref string, 
 	}
 
 	return Readme{}, ErrReadmeNotFound
+}
+
+func (s Store) GetFile(ctx context.Context, dbRepo db.Repository, ref string, filePath string) (File, error) {
+	if ref == "" {
+		ref = dbRepo.DefaultBranch
+	}
+	if !isSafeRef(ref) {
+		return File{}, ErrInvalidRef
+	}
+
+	filePath, err := normalizeGitDirectory(filePath)
+	if err != nil {
+		return File{}, err
+	}
+	if filePath == "" {
+		return File{}, ErrInvalidPath
+	}
+
+	repoPath := s.GetRepoPath(dbRepo)
+	commitOID, err := s.git.ResolveCommit(ctx, repoPath, ref)
+	if err != nil {
+		return File{}, ErrFileNotFound
+	}
+
+	entry, err := s.git.LsTreePath(ctx, repoPath, commitOID, filePath)
+	if err != nil {
+		return File{}, err
+	}
+	if entry == nil || entry.Type != "blob" {
+		return File{}, ErrFileNotFound
+	}
+	if entry.Size == nil {
+		return File{}, ErrFileNotFound
+	}
+	if *entry.Size > maxFileBytes {
+		return File{}, ErrFileTooLarge
+	}
+
+	content, err := s.git.CatFileBlob(ctx, repoPath, entry.OID)
+	if err != nil {
+		return File{}, err
+	}
+
+	return File{
+		Ref:       ref,
+		CommitOID: commitOID,
+		Path:      filePath,
+		Name:      pathpkg.Base(filePath),
+		OID:       entry.OID,
+		Size:      *entry.Size,
+		Content:   string(content),
+	}, nil
 }
 
 func (s Store) GetTree(ctx context.Context, dbRepo db.Repository, ref string, directory string) (Tree, error) {
@@ -374,6 +439,27 @@ func (s Store) ListBranchRefs(ctx context.Context, dbRepo db.Repository) ([]Ref,
 	return refs, nil
 }
 
+func (s Store) BranchExists(ctx context.Context, dbRepo db.Repository, branchName string) (bool, error) {
+	branchName = strings.TrimSpace(branchName)
+	if !isSafeRef(branchName) {
+		return false, ErrInvalidRef
+	}
+
+	repoPath := s.GetRepoPath(dbRepo)
+	gitRefs, err := s.git.ListRefs(ctx, repoPath)
+	if err != nil {
+		return false, err
+	}
+
+	for _, ref := range gitRefs {
+		if isBranchRef(ref) && ref.Name == branchName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func normalizeGitDirectory(directory string) (string, error) {
 	directory = strings.TrimSpace(strings.ReplaceAll(directory, "\\", "/"))
 	if directory == "" || directory == "." || directory == "/" {
@@ -452,7 +538,7 @@ func sortRefs(refs []Ref) {
 }
 
 func isBranchRef(ref git.Ref) bool {
-	return ref.Type == "commit"
+	return strings.HasPrefix(ref.FullName, "refs/heads/") && ref.Type == "commit"
 }
 
 func isSafeRef(ref string) bool {

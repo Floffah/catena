@@ -301,6 +301,46 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+        - v1
+      summary: Update Repository
+      description: Merge-update repository settings. Only the repository owner can update these settings.
+      operationId: updateRepository
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRepositoryRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Repository"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/repositories/{owner}/{repository}/issues":
     get:
       tags:
@@ -456,6 +496,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RepositoryReadme"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  "/v1/repositories/{owner}/{repository}/file":
+    get:
+      tags:
+        - v1
+      summary: Get Repository File
+      description: Retrieve a text file at a repository path. Public repositories can be retrieved without authentication.
+      operationId: getRepositoryFile
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repository
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: query
+          required: false
+          description: Branch, tag, or commit to read from. Defaults to the repository default branch.
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: true
+          description: File path to read.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryFile"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -724,6 +812,15 @@ components:
           properties:
             ownerName:
               type: string
+    UpdateRepositoryRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        visibility:
+          $ref: "#/components/schemas/RepositoryVisibility"
+        defaultBranch:
+          type: string
     Error:
       type: object
       required:
@@ -1124,6 +1221,36 @@ components:
       enum:
         - branch
     RepositoryReadme:
+      type: object
+      required:
+        - ref
+        - commitOid
+        - path
+        - name
+        - oid
+        - size
+        - encoding
+        - content
+      properties:
+        ref:
+          type: string
+        commitOid:
+          type: string
+        path:
+          type: string
+        name:
+          type: string
+        oid:
+          type: string
+        size:
+          type: integer
+          format: int64
+        encoding:
+          type: string
+          example: utf-8
+        content:
+          type: string
+    RepositoryFile:
       type: object
       required:
         - ref

@@ -5,7 +5,8 @@ import { ThemeProvider } from "next-themes";
 import { Geist, JetBrains_Mono } from "next/font/google";
 import { PropsWithChildren } from "react";
 
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import AuthProvider from "@/providers/AuthProvider";
 import QueryClientProvider from "@/providers/QueryClientProvider";
@@ -21,7 +22,14 @@ const monoFont = JetBrains_Mono({
 
 export const metadata: Metadata = {
     title: "Catena",
-    description: "Next generation git server",
+    description: "Where the next generation of open source software is built.",
+    openGraph: {
+        title: "Catena",
+        description:
+            "Where the next generation of open source software is built.",
+        url: "https://oncatena.com",
+        siteName: "Catena",
+    },
 };
 
 export default function RootLayout({ children }: PropsWithChildren) {
@@ -45,15 +53,17 @@ export default function RootLayout({ children }: PropsWithChildren) {
                     disableTransitionOnChange
                     enableSystem
                 >
-                    <ClerkProvider appearance={{ theme: shadcn }}>
-                        <QueryClientProvider>
-                            <AuthProvider>
-                                {children}
+                    <TooltipProvider>
+                        <ClerkProvider appearance={{ theme: shadcn }}>
+                            <QueryClientProvider>
+                                <AuthProvider>
+                                    {children}
 
-                                <SidebarProvider />
-                            </AuthProvider>
-                        </QueryClientProvider>
-                    </ClerkProvider>
+                                    <Toaster />
+                                </AuthProvider>
+                            </QueryClientProvider>
+                        </ClerkProvider>
+                    </TooltipProvider>
                 </ThemeProvider>
             </body>
         </html>

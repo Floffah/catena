@@ -27,6 +27,7 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-success: var(--success);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -66,6 +67,7 @@
     --accent: oklch(0.963 0.002 197.1);
     --accent-foreground: oklch(0.218 0.008 223.9);
     --destructive: oklch(0.577 0.245 27.325);
+    --success: oklch(62.7% 0.194 149.214);
     --border: oklch(0.925 0.005 214.3);
     --input: oklch(0.925 0.005 214.3);
     --ring: oklch(0.723 0.014 214.4);
@@ -101,6 +103,7 @@
     --accent: oklch(0.275 0.011 216.9);
     --accent-foreground: oklch(0.987 0.002 197.1);
     --destructive: oklch(0.704 0.191 22.216);
+    --success: oklch(79.2% 0.209 151.711);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.56 0.021 213.5);
@@ -147,5 +150,32 @@
 @custom-variant next-peer-data-displaces-nav {
     &:has(~ .peer[data-displaces-nav="true"]) {
         @slot;
+    }
+}
+
+@layer components {
+    html.dark .shiki,
+    html.dark .shiki span {
+        color: var(--shiki-dark) !important;
+        background-color: var(--shiki-dark-bg) !important;
+        /* Optional, if you also want font styles */
+        font-style: var(--shiki-dark-font-style) !important;
+        font-weight: var(--shiki-dark-font-weight) !important;
+        text-decoration: var(--shiki-dark-text-decoration) !important;
+    }
+
+    .line-numbers {
+        counter-reset: step;
+        counter-increment: step 0;
+    }
+
+    .line-numbers .line::before {
+        content: counter(step);
+        counter-increment: step;
+        width: 1rem;
+        margin-right: 1.5rem;
+        display: inline-block;
+        text-align: right;
+        color: rgba(115, 138, 148, 0.4);
     }
 }

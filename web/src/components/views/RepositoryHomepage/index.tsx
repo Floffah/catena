@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 
+import { RepositoryHeader } from "@/components/views/RepositoryHomepage/RepositoryHeader";
+
 import RepositoryAside from "./RepositoryAside";
 import { RepositoryFileList } from "./RepositoryFileList";
 import { RepositoryReadme } from "./RepositoryReadme";
@@ -14,8 +16,13 @@ export default async function RepositoryHomepage({
     currentRef: string;
 }) {
     return (
-        <main className="flex gap-4">
+        <main className="flex flex-col gap-4 lg:flex-row">
             <div className="flex flex-1 flex-col gap-4">
+                <RepositoryHeader
+                    ownerName={ownerName}
+                    repoName={repoName}
+                    currentRef={currentRef}
+                />
                 <RepositoryReadme
                     ownerName={ownerName}
                     repoName={repoName}

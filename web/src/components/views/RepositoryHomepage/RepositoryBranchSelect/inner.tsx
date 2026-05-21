@@ -37,7 +37,8 @@ export default function RepositoryBranchSelectInner({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline">
-                    {currentRef}
+                    <span className="text-muted-foreground">Currently on</span>{" "}
+                    <strong>{currentRef}</strong>
                     <IconSelector className="size-4" />
                 </Button>
             </DropdownMenuTrigger>
