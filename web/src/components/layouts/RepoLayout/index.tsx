@@ -4,6 +4,7 @@ import { PropsWithChildren } from "react";
 
 import RepoNavLink from "@/components/layouts/RepoLayout/RepoNavLink";
 import { serverGetRepository } from "@/lib/server/repository";
+import { serverGetCurrentUser } from "@/lib/server/users";
 
 export default async function RepoLayout({
     children,
@@ -13,11 +14,16 @@ export default async function RepoLayout({
     ownerName: string;
     repoName: string;
 }>) {
-    const repo = await serverGetRepository(ownerName, repoName);
+    const [repo, user] = await Promise.all([
+        serverGetRepository(ownerName, repoName),
+        serverGetCurrentUser(),
+    ]);
 
     if (!repo) {
         return notFound();
     }
+
+    const canManageRepository = user?.name === repo.ownerName;
 
     return (
         <div
@@ -47,6 +53,13 @@ export default async function RepoLayout({
                         >
                             Issues
                         </RepoNavLink>
+                        {canManageRepository && (
+                            <RepoNavLink
+                                href={`/${repo.ownerName}/${repo.name}/settings`}
+                            >
+                                Settings
+                            </RepoNavLink>
+                        )}
                     </nav>
                 </div>
             </div>

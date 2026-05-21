@@ -396,6 +396,18 @@ type Repository struct {
 	Visibility    RepositoryVisibility `json:"visibility"`
 }
 
+// RepositoryFile defines model for RepositoryFile.
+type RepositoryFile struct {
+	CommitOid string `json:"commitOid"`
+	Content   string `json:"content"`
+	Encoding  string `json:"encoding"`
+	Name      string `json:"name"`
+	Oid       string `json:"oid"`
+	Path      string `json:"path"`
+	Ref       string `json:"ref"`
+	Size      int64  `json:"size"`
+}
+
 // RepositoryItem defines model for RepositoryItem.
 type RepositoryItem struct {
 	// AuthorId Null when the author account has been deleted.
@@ -578,6 +590,13 @@ type UpdateAuthenticatedUserRequest struct {
 	DisplayName *string `json:"displayName,omitempty"`
 }
 
+// UpdateRepositoryRequest defines model for UpdateRepositoryRequest.
+type UpdateRepositoryRequest struct {
+	DefaultBranch *string               `json:"defaultBranch,omitempty"`
+	Description   *string               `json:"description,omitempty"`
+	Visibility    *RepositoryVisibility `json:"visibility,omitempty"`
+}
+
 // User defines model for User.
 type User struct {
 	AvatarUrl   *string              `json:"avatarUrl,omitempty"`
@@ -612,6 +631,15 @@ type NotFound = Error
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
+
+// GetRepositoryFileParams defines parameters for GetRepositoryFile.
+type GetRepositoryFileParams struct {
+	// Ref Branch, tag, or commit to read from. Defaults to the repository default branch.
+	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Path File path to read.
+	Path string `form:"path" json:"path"`
+}
 
 // ResolveRepositoryGitPathParams defines parameters for ResolveRepositoryGitPath.
 type ResolveRepositoryGitPathParams struct {
@@ -657,6 +685,9 @@ type CreateGitAccessTokenJSONRequestBody = CreateGitAccessTokenRequest
 
 // CreateRepositoryJSONRequestBody defines body for CreateRepository for application/json ContentType.
 type CreateRepositoryJSONRequestBody = CreateRepositoryRequest
+
+// UpdateRepositoryJSONRequestBody defines body for UpdateRepository for application/json ContentType.
+type UpdateRepositoryJSONRequestBody = UpdateRepositoryRequest
 
 // CreateRepositoryIssueJSONRequestBody defines body for CreateRepositoryIssue for application/json ContentType.
 type CreateRepositoryIssueJSONRequestBody = CreateIssueRequest
@@ -896,6 +927,12 @@ type ServerInterface interface {
 	// Get Repository
 	// (GET /v1/repositories/{owner}/{repository})
 	GetRepositoryByOwnerAndName(c *gin.Context, owner string, repository string)
+	// Update Repository
+	// (PATCH /v1/repositories/{owner}/{repository})
+	UpdateRepository(c *gin.Context, owner string, repository string)
+	// Get Repository File
+	// (GET /v1/repositories/{owner}/{repository}/file)
+	GetRepositoryFile(c *gin.Context, owner string, repository string, params GetRepositoryFileParams)
 	// Resolve Repository Git Path
 	// (GET /v1/repositories/{owner}/{repository}/git-path/resolve)
 	ResolveRepositoryGitPath(c *gin.Context, owner string, repository string, params ResolveRepositoryGitPathParams)
@@ -1078,6 +1115,102 @@ func (siw *ServerInterfaceWrapper) GetRepositoryByOwnerAndName(c *gin.Context) {
 	}
 
 	siw.Handler.GetRepositoryByOwnerAndName(c, owner, repository)
+}
+
+// UpdateRepository operation middleware
+func (siw *ServerInterfaceWrapper) UpdateRepository(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", c.Param("owner"), &owner, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter owner: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "repository" -------------
+	var repository string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repository", c.Param("repository"), &repository, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter repository: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateRepository(c, owner, repository)
+}
+
+// GetRepositoryFile operation middleware
+func (siw *ServerInterfaceWrapper) GetRepositoryFile(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", c.Param("owner"), &owner, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter owner: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "repository" -------------
+	var repository string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repository", c.Param("repository"), &repository, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter repository: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetRepositoryFileParams
+
+	// ------------- Optional query parameter "ref" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ref", c.Request.URL.Query(), &params.Ref, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter ref: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Required query parameter "path" -------------
+
+	if paramValue := c.Query("path"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument path is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", c.Request.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter path: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetRepositoryFile(c, owner, repository, params)
 }
 
 // ResolveRepositoryGitPath operation middleware
@@ -1582,6 +1715,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/v1/healthz", wrapper.Healthz)
 	router.POST(options.BaseURL+"/v1/repositories", wrapper.CreateRepository)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository", wrapper.GetRepositoryByOwnerAndName)
+	router.PATCH(options.BaseURL+"/v1/repositories/:owner/:repository", wrapper.UpdateRepository)
+	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/file", wrapper.GetRepositoryFile)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/git-path/resolve", wrapper.ResolveRepositoryGitPath)
 	router.GET(options.BaseURL+"/v1/repositories/:owner/:repository/issues", wrapper.ListRepositoryIssues)
 	router.POST(options.BaseURL+"/v1/repositories/:owner/:repository/issues", wrapper.CreateRepositoryIssue)
@@ -1886,6 +2021,129 @@ type GetRepositoryByOwnerAndName500JSONResponse struct {
 }
 
 func (response GetRepositoryByOwnerAndName500JSONResponse) VisitGetRepositoryByOwnerAndNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateRepositoryRequestObject struct {
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+	Body       *UpdateRepositoryJSONRequestBody
+}
+
+type UpdateRepositoryResponseObject interface {
+	VisitUpdateRepositoryResponse(w http.ResponseWriter) error
+}
+
+type UpdateRepository200JSONResponse Repository
+
+func (response UpdateRepository200JSONResponse) VisitUpdateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateRepository400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateRepository400JSONResponse) VisitUpdateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateRepository401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateRepository401JSONResponse) VisitUpdateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateRepository403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateRepository403JSONResponse) VisitUpdateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateRepository404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateRepository404JSONResponse) VisitUpdateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateRepository500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response UpdateRepository500JSONResponse) VisitUpdateRepositoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryFileRequestObject struct {
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+	Params     GetRepositoryFileParams
+}
+
+type GetRepositoryFileResponseObject interface {
+	VisitGetRepositoryFileResponse(w http.ResponseWriter) error
+}
+
+type GetRepositoryFile200JSONResponse RepositoryFile
+
+func (response GetRepositoryFile200JSONResponse) VisitGetRepositoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryFile400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetRepositoryFile400JSONResponse) VisitGetRepositoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryFile401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetRepositoryFile401JSONResponse) VisitGetRepositoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryFile404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetRepositoryFile404JSONResponse) VisitGetRepositoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryFile500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetRepositoryFile500JSONResponse) VisitGetRepositoryFileResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -2551,6 +2809,12 @@ type StrictServerInterface interface {
 	// Get Repository
 	// (GET /v1/repositories/{owner}/{repository})
 	GetRepositoryByOwnerAndName(ctx context.Context, request GetRepositoryByOwnerAndNameRequestObject) (GetRepositoryByOwnerAndNameResponseObject, error)
+	// Update Repository
+	// (PATCH /v1/repositories/{owner}/{repository})
+	UpdateRepository(ctx context.Context, request UpdateRepositoryRequestObject) (UpdateRepositoryResponseObject, error)
+	// Get Repository File
+	// (GET /v1/repositories/{owner}/{repository}/file)
+	GetRepositoryFile(ctx context.Context, request GetRepositoryFileRequestObject) (GetRepositoryFileResponseObject, error)
 	// Resolve Repository Git Path
 	// (GET /v1/repositories/{owner}/{repository}/git-path/resolve)
 	ResolveRepositoryGitPath(ctx context.Context, request ResolveRepositoryGitPathRequestObject) (ResolveRepositoryGitPathResponseObject, error)
@@ -2793,6 +3057,71 @@ func (sh *strictHandler) GetRepositoryByOwnerAndName(ctx *gin.Context, owner str
 		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(GetRepositoryByOwnerAndNameResponseObject); ok {
 		if err := validResponse.VisitGetRepositoryByOwnerAndNameResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateRepository operation middleware
+func (sh *strictHandler) UpdateRepository(ctx *gin.Context, owner string, repository string) {
+	var request UpdateRepositoryRequestObject
+
+	request.Owner = owner
+	request.Repository = repository
+
+	var body UpdateRepositoryJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
+		ctx.Error(err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateRepository(ctx, request.(UpdateRepositoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateRepository")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(UpdateRepositoryResponseObject); ok {
+		if err := validResponse.VisitUpdateRepositoryResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRepositoryFile operation middleware
+func (sh *strictHandler) GetRepositoryFile(ctx *gin.Context, owner string, repository string, params GetRepositoryFileParams) {
+	var request GetRepositoryFileRequestObject
+
+	request.Owner = owner
+	request.Repository = repository
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRepositoryFile(ctx, request.(GetRepositoryFileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRepositoryFile")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(GetRepositoryFileResponseObject); ok {
+		if err := validResponse.VisitGetRepositoryFileResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {

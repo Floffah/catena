@@ -3,7 +3,9 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import ExpandableContent from "@/components/ExpandableContent";
-import ShikiCodeBlock from "@/components/ShikiCodeBlock";
+import ShikiCodeBlock, {
+    fileNameToLanguage,
+} from "@/components/ShikiCodeBlock";
 import { serverGetRepositoryFile } from "@/lib/server/repository";
 
 function isReadmePath(path: string) {
@@ -64,7 +66,7 @@ export default async function RepositoryFileViewer({
             {!shouldRenderMarkdown && (
                 <div className="overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10">
                     <ShikiCodeBlock
-                        lang="go"
+                        lang={fileNameToLanguage(file.name)}
                         className="overflow-x-auto p-4 text-xs leading-relaxed"
                     >
                         {file.content}

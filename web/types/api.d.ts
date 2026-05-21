@@ -209,7 +209,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Repository
+         * @description Merge-update repository settings. Only the repository owner can update these settings.
+         */
+        patch: operations["updateRepository"];
         trace?: never;
     };
     "/v1/repositories/{owner}/{repository}/issues": {
@@ -421,6 +425,11 @@ export interface components {
         };
         CreateRepositoryResponse: components["schemas"]["Repository"] & {
             ownerName: string;
+        };
+        UpdateRepositoryRequest: {
+            description?: string;
+            visibility?: components["schemas"]["RepositoryVisibility"];
+            defaultBranch?: string;
         };
         Error: {
             error: string;
@@ -769,6 +778,8 @@ export type SchemaCreateRepositoryRequest =
     components["schemas"]["CreateRepositoryRequest"];
 export type SchemaCreateRepositoryResponse =
     components["schemas"]["CreateRepositoryResponse"];
+export type SchemaUpdateRepositoryRequest =
+    components["schemas"]["UpdateRepositoryRequest"];
 export type SchemaError = components["schemas"]["Error"];
 export type SchemaGitAccessToken = components["schemas"]["GitAccessToken"];
 export type SchemaRepository = components["schemas"]["Repository"];
@@ -1116,6 +1127,38 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateRepository: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRepositoryRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Repository"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
