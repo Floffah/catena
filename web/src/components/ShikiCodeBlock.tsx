@@ -12,22 +12,47 @@ import { cn } from "@/lib/utils";
 import lightTheme from "@/public/code-theme-light.json";
 import theme from "@/public/code-theme.json";
 
-const fileNamesToLanguages: Record<string, BundledLanguage> = {
-    Dockerfile: "docker",
-    Makefile: "makefile",
-    "CMakeLists.txt": "cmake",
-    Gemfile: "ruby",
-    Rakefile: "ruby",
-    Vagrantfile: "ruby",
-    Podfile: "ruby",
-    Brewfile: "ruby",
-    Justfile: "just",
-    "go.mod": "go",
-    "go.sum": "go",
-    "bun.lock": "json",
-    "yarn.lock": "json",
-    "tern.conf": "ini",
-    ".env.example": "dotenv",
+enum SupportedLanguages {
+    JavaScript = "javascript",
+    TypeScript = "typescript",
+    Python = "python",
+    Go = "go",
+    Java = "java",
+    Ruby = "ruby",
+    PHP = "php",
+    Rust = "rust",
+    Cpp = "cpp",
+    CSharp = "csharp",
+    HTML = "html",
+    CSS = "css",
+    JSON = "json",
+    Markdown = "markdown",
+    YAML = "yaml",
+    Dotenv = "dotenv",
+    Bash = "bash",
+    Docker = "docker",
+    Makefile = "makefile",
+    CMake = "cmake",
+    Just = "just",
+    INI = "ini",
+}
+
+const fileNamesToLanguages: Record<string, SupportedLanguages> = {
+    Dockerfile: SupportedLanguages.Docker,
+    Makefile: SupportedLanguages.Makefile,
+    "CMakeLists.txt": SupportedLanguages.CMake,
+    Gemfile: SupportedLanguages.Ruby,
+    Rakefile: SupportedLanguages.Ruby,
+    Vagrantfile: SupportedLanguages.Ruby,
+    Podfile: SupportedLanguages.Ruby,
+    Brewfile: SupportedLanguages.Ruby,
+    Justfile: SupportedLanguages.Just,
+    "go.mod": SupportedLanguages.Go,
+    "go.sum": SupportedLanguages.Go,
+    "bun.lock": SupportedLanguages.JSON,
+    "yarn.lock": SupportedLanguages.JSON,
+    "tern.conf": SupportedLanguages.INI,
+    ".env.example": SupportedLanguages.Dotenv,
 };
 
 export function fileNameToLanguage(fileName: string): BundledLanguage | string {
@@ -38,64 +63,66 @@ export function fileNameToLanguage(fileName: string): BundledLanguage | string {
     const ext = fileName.split(".").pop()?.toLowerCase();
 
     if (!ext) {
-        return "ts";
+        return SupportedLanguages.TypeScript;
     }
 
-    if (ext in bundledLanguages) {
-        return ext as BundledLanguage;
-    }
+    // if (ext in bundledLanguages) {
+    //     return ext as BundledLanguage;
+    // }
 
     switch (ext) {
         case "js":
         case "mjs":
         case "cjs":
         case "jsx":
-            return "javascript";
+            return SupportedLanguages.JavaScript;
         case "ts":
         case "mts":
         case "cts":
         case "tsx":
-            return "typescript";
+            return SupportedLanguages.TypeScript;
         case "py":
-            return "python";
+            return SupportedLanguages.Python;
         case "go":
-            return "go";
+            return SupportedLanguages.Go;
         case "java":
-            return "java";
+            return SupportedLanguages.Java;
         case "rb":
-            return "ruby";
+            return SupportedLanguages.Ruby;
         case "php":
-            return "php";
+            return SupportedLanguages.PHP;
         case "rs":
-            return "rust";
+            return SupportedLanguages.Rust;
         case "cpp":
         case "cc":
         case "cxx":
         case "c":
-            return "cpp";
+            return SupportedLanguages.Cpp;
         case "cs":
-            return "csharp";
+            return SupportedLanguages.CSharp;
         case "html":
         case "htm":
-            return "html";
+            return SupportedLanguages.HTML;
         case "css":
-            return "css";
+            return SupportedLanguages.CSS;
         case "json":
-            return "json";
+            return SupportedLanguages.JSON;
         case "md":
-            return "markdown";
+            return SupportedLanguages.Markdown;
         case "yml":
         case "yaml":
-            return "yaml";
+            return SupportedLanguages.YAML;
         case "env":
-            return "dotenv";
+            return SupportedLanguages.Dotenv;
         case "sh":
-            return "bash";
+            return SupportedLanguages.Bash;
+        case "sql":
+            return "sql";
         default:
             if (ext && ext in bundledLanguages) {
                 return ext as BundledLanguage;
             }
-            return "ts";
+            return SupportedLanguages.TypeScript;
     }
 }
 
@@ -113,7 +140,7 @@ export default async function ShikiCodeBlock({
             theme as unknown as ThemeInput,
             lightTheme as unknown as ThemeInput,
         ],
-        langs: ["go"],
+        langs: Object.values(SupportedLanguages),
     });
     const out = highlighter.codeToHast(children, {
         lang: lang,

@@ -165,20 +165,22 @@ func (s *Server) UpdateRepository(ctx context.Context, request UpdateRepositoryR
 		}, nil
 	}
 
-	repository, err := s.repository.GetRepositoryByOwnerAndName(ctx, db.GetRepositoryByOwnerAndNameParams{
-		OwnerName:      request.Owner,
-		RepositoryName: request.Repository,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+	repository, accessErr := s.getAccessibleRepositoryForUser(ctx, request.Owner, request.Repository, &user)
+	if accessErr != nil {
+		switch accessErr.Status {
+		case http.StatusUnauthorized:
+			return UpdateRepository401JSONResponse{
+				UnauthorizedJSONResponse: UnauthorizedJSONResponse{Error: accessErr.Message},
+			}, nil
+		case http.StatusNotFound:
 			return UpdateRepository404JSONResponse{
-				NotFoundJSONResponse: NotFoundJSONResponse{Error: "repository not found"},
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: accessErr.Message},
+			}, nil
+		default:
+			return UpdateRepository500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: accessErr.Message},
 			}, nil
 		}
-
-		return UpdateRepository500JSONResponse{
-			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load repository"},
-		}, nil
 	}
 
 	if repository.OwnerID != user.ID {
@@ -222,6 +224,25 @@ func (s *Server) UpdateRepository(ctx context.Context, request UpdateRepositoryR
 		return UpdateRepository400JSONResponse{
 			BadRequestJSONResponse: BadRequestJSONResponse{Error: "default branch is required"},
 		}, nil
+	}
+	if request.Body.DefaultBranch != nil && defaultBranch != repository.DefaultBranch {
+		branchExists, err := s.git.BranchExists(ctx, repository, defaultBranch)
+		if err != nil {
+			if errors.Is(err, gitstore.ErrInvalidRef) {
+				return UpdateRepository400JSONResponse{
+					BadRequestJSONResponse: BadRequestJSONResponse{Error: "default branch is not a valid ref"},
+				}, nil
+			}
+
+			return UpdateRepository500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to validate default branch"},
+			}, nil
+		}
+		if !branchExists {
+			return UpdateRepository400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: "default branch does not exist"},
+			}, nil
+		}
 	}
 
 	updatedRepository, err := s.repository.UpdateRepository(ctx, db.UpdateRepositoryParams{
@@ -604,6 +625,10 @@ type repositoryAccessError struct {
 }
 
 func (s *Server) getAccessibleRepository(ctx context.Context, ownerName string, repositoryName string) (db.Repository, *repositoryAccessError) {
+	return s.getAccessibleRepositoryForUser(ctx, ownerName, repositoryName, nil)
+}
+
+func (s *Server) getAccessibleRepositoryForUser(ctx context.Context, ownerName string, repositoryName string, user *db.User) (db.Repository, *repositoryAccessError) {
 	repository, err := s.repository.GetRepositoryByOwnerAndName(ctx, db.GetRepositoryByOwnerAndNameParams{
 		OwnerName:      ownerName,
 		RepositoryName: repositoryName,
@@ -626,16 +651,26 @@ func (s *Server) getAccessibleRepository(ctx context.Context, ownerName string, 
 		return repository, nil
 	}
 
-	authUser, err := s.auth.GetAuthFromContext(ctx)
-	if err != nil || authUser == nil {
-		return db.Repository{}, &repositoryAccessError{
-			Status:  http.StatusUnauthorized,
-			Message: "unauthorized",
+	if user == nil {
+		authUser, err := s.auth.GetAuthFromContext(ctx)
+		if err != nil || authUser == nil {
+			return db.Repository{}, &repositoryAccessError{
+				Status:  http.StatusUnauthorized,
+				Message: "unauthorized",
+			}
 		}
+
+		dbUser, err := s.auth.GetUserFromAuth(ctx, authUser)
+		if err != nil {
+			return db.Repository{}, &repositoryAccessError{
+				Status:  http.StatusNotFound,
+				Message: "repository not found",
+			}
+		}
+		user = &dbUser
 	}
 
-	user, err := s.auth.GetUserFromAuth(ctx, authUser)
-	if err != nil || user.ID != repository.OwnerID {
+	if user.ID != repository.OwnerID {
 		return db.Repository{}, &repositoryAccessError{
 			Status:  http.StatusNotFound,
 			Message: "repository not found",

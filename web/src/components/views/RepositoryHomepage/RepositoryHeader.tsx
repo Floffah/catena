@@ -42,7 +42,7 @@ export async function RepositoryHeader({
                         </Link>
                     </Button>
                     <Button variant="outline" asChild>
-                        <Link href={`/${ownerName}/${repoName}/refs/branches`}>
+                        <Link href={`/${ownerName}/${repoName}/refs/tags`}>
                             <IconVersions />
                             Tags
                         </Link>

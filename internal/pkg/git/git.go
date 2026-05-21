@@ -32,9 +32,10 @@ type CommitSummary struct {
 }
 
 type Ref struct {
-	Name string
-	Type string
-	OID  string
+	FullName string
+	Name     string
+	Type     string
+	OID      string
 }
 
 // Git client, currently just a backend for gitstore and git binary, but eventually will incorporate go-git
@@ -81,7 +82,7 @@ func (g Git) ResolveCommit(ctx context.Context, repoPath string, ref string) (st
 }
 
 func (g Git) ListRefs(ctx context.Context, repoPath string) ([]Ref, error) {
-	cmd := exec.CommandContext(ctx, g.BinaryPath, "-C", repoPath, "for-each-ref", "--format=%(refname:short)%09%(objecttype)%09%(objectname)", "refs/heads", "refs/tags")
+	cmd := exec.CommandContext(ctx, g.BinaryPath, "-C", repoPath, "for-each-ref", "--format=%(refname)%09%(refname:short)%09%(objecttype)%09%(objectname)", "refs/heads", "refs/tags")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -94,7 +95,11 @@ func (g Git) ListRefs(ctx context.Context, repoPath string) ([]Ref, error) {
 			continue
 		}
 
-		name, rest, ok := strings.Cut(record, "\t")
+		fullName, rest, ok := strings.Cut(record, "\t")
+		if !ok {
+			return nil, fmt.Errorf("failed to parse for-each-ref output")
+		}
+		name, rest, ok := strings.Cut(rest, "\t")
 		if !ok {
 			return nil, fmt.Errorf("failed to parse for-each-ref output")
 		}
@@ -104,9 +109,10 @@ func (g Git) ListRefs(ctx context.Context, repoPath string) ([]Ref, error) {
 		}
 
 		refs = append(refs, Ref{
-			Name: name,
-			Type: refType,
-			OID:  oid,
+			FullName: fullName,
+			Name:     name,
+			Type:     refType,
+			OID:      oid,
 		})
 	}
 

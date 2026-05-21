@@ -439,6 +439,27 @@ func (s Store) ListBranchRefs(ctx context.Context, dbRepo db.Repository) ([]Ref,
 	return refs, nil
 }
 
+func (s Store) BranchExists(ctx context.Context, dbRepo db.Repository, branchName string) (bool, error) {
+	branchName = strings.TrimSpace(branchName)
+	if !isSafeRef(branchName) {
+		return false, ErrInvalidRef
+	}
+
+	repoPath := s.GetRepoPath(dbRepo)
+	gitRefs, err := s.git.ListRefs(ctx, repoPath)
+	if err != nil {
+		return false, err
+	}
+
+	for _, ref := range gitRefs {
+		if isBranchRef(ref) && ref.Name == branchName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func normalizeGitDirectory(directory string) (string, error) {
 	directory = strings.TrimSpace(strings.ReplaceAll(directory, "\\", "/"))
 	if directory == "" || directory == "." || directory == "/" {
@@ -517,7 +538,7 @@ func sortRefs(refs []Ref) {
 }
 
 func isBranchRef(ref git.Ref) bool {
-	return ref.Type == "commit"
+	return strings.HasPrefix(ref.FullName, "refs/heads/") && ref.Type == "commit"
 }
 
 func isSafeRef(ref string) bool {
