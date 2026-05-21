@@ -276,6 +276,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{owner}/{repository}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Repository File
+         * @description Retrieve a text file at a repository path. Public repositories can be retrieved without authentication.
+         */
+        get: operations["getRepositoryFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories/{owner}/{repository}/latest-commit": {
         parameters: {
             query?: never;
@@ -611,6 +631,18 @@ export interface components {
             encoding: string;
             content: string;
         };
+        RepositoryFile: {
+            ref: string;
+            commitOid: string;
+            path: string;
+            name: string;
+            oid: string;
+            /** Format: int64 */
+            size: number;
+            /** @example utf-8 */
+            encoding: string;
+            content: string;
+        };
         RepositoryLatestCommit: {
             ref: string;
             commitOid: string;
@@ -778,6 +810,7 @@ export type SchemaRepositoryRef = components["schemas"]["RepositoryRef"];
 export type SchemaRepositoryRefType =
     components["schemas"]["RepositoryRefType"];
 export type SchemaRepositoryReadme = components["schemas"]["RepositoryReadme"];
+export type SchemaRepositoryFile = components["schemas"]["RepositoryFile"];
 export type SchemaRepositoryLatestCommit =
     components["schemas"]["RepositoryLatestCommit"];
 export type SchemaResolvedRepositoryGitPath =
@@ -1196,6 +1229,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RepositoryReadme"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getRepositoryFile: {
+        parameters: {
+            query: {
+                /** @description Branch, tag, or commit to read from. Defaults to the repository default branch. */
+                ref?: string;
+                /** @description File path to read. */
+                path: string;
+            };
+            header?: never;
+            path: {
+                owner: string;
+                repository: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryFile"];
                 };
             };
             400: components["responses"]["BadRequest"];

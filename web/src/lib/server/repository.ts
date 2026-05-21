@@ -47,6 +47,30 @@ export const serverGetRepositoryReadme = cache(
     },
 );
 
+export const serverGetRepositoryFile = cache(
+    async (ownerName: string, repoName: string, ref = "main", path: string) => {
+        const apiClient = await serverGetApiClient();
+
+        const res = await apiClient.GET(
+            "/v1/repositories/{owner}/{repository}/file",
+            {
+                params: {
+                    path: {
+                        owner: ownerName,
+                        repository: repoName,
+                    },
+                    query: {
+                        path,
+                        ref,
+                    },
+                },
+            },
+        );
+
+        return res.data;
+    },
+);
+
 export const serverGetRepositoryTree = cache(
     async (ownerName: string, repoName: string, ref = "main", path = "/") => {
         const apiClient = await serverGetApiClient();

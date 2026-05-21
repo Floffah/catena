@@ -32,7 +32,10 @@ export async function RepositoryFileList({
         : `/${ownerName}/${repoName}/browse/${tree.ref}`;
 
     return (
-        <div className="flex flex-col gap-4 rounded-lg bg-card text-card-foreground ring-1 ring-foreground/10">
+        <div
+            id="browse"
+            className="flex flex-col gap-4 rounded-lg bg-card text-card-foreground ring-1 ring-foreground/10"
+        >
             {(tree.entries.length > 0 || !isRoot) && (
                 <ul className="divide-y divide-card-foreground/10 overflow-hidden rounded-lg">
                     {!isRoot && (
