@@ -22,35 +22,63 @@ import (
 
 type Server struct {
 	repository db.Queries
-	dbConn     *pgxpool.Pool
-	auth       *auth.AuthService
+	dbConn     db.TxDB
+	auth       auth.Provider
 	git        gitstore.Store
-	gitAuth    gitauth.Service
+	gitTokens  gitauth.TokenIssuer
+}
+
+type ServerDeps struct {
+	DB                    db.TxDB
+	Auth                  auth.Provider
+	Git                   gitstore.Store
+	GitTokens             gitauth.TokenIssuer
+	GitCredentialVerifier gitauth.GitCredentialVerifier
+	CorsAllowedOrigins    []string
 }
 
 func NewServer(
 	conn *pgxpool.Pool,
-	authService *auth.AuthService,
+	authService *auth.Service,
 	gitService gitstore.Store,
 	corsAllowedOrigins []string,
 	port string,
 ) (*http.Server, error) {
 	gitAuthService := gitauth.NewService(conn)
+	r := NewRouter(ServerDeps{
+		DB:                    conn,
+		Auth:                  authService,
+		Git:                   gitService,
+		GitTokens:             gitAuthService,
+		GitCredentialVerifier: gitAuthService,
+		CorsAllowedOrigins:    corsAllowedOrigins,
+	})
+
+	s := &http.Server{
+		Handler:           r,
+		Addr:              "0.0.0.0:" + port,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	return s, nil
+}
+
+func NewRouter(deps ServerDeps) *gin.Engine {
 	server := Server{
-		repository: *db.New(conn),
-		dbConn:     conn,
-		auth:       authService,
-		git:        gitService,
-		gitAuth:    gitAuthService,
+		repository: *db.New(deps.DB),
+		dbConn:     deps.DB,
+		auth:       deps.Auth,
+		git:        deps.Git,
+		gitTokens:  deps.GitTokens,
 	}
 	strictServer := NewStrictHandler(&server, []StrictMiddlewareFunc{})
 
 	r := gin.Default()
 	r.Use(httputil.ServerErrorLogger())
 	r.Use(httputil.CorsMiddleware(httputil.CorsConfig{
-		AllowedOrigins: corsAllowedOrigins,
+		AllowedOrigins: deps.CorsAllowedOrigins,
 	}))
-	r.Use(authService.Middleware())
+	r.Use(deps.Auth.Middleware())
 	r.Handle("GET", "/docs", func(c *gin.Context) {
 		html, err := scalargo.NewV2(
 			scalargo.WithSpecBytes(api.V1ApiSpec),
@@ -68,16 +96,10 @@ func NewServer(
 	})
 
 	RegisterHandlers(r, strictServer)
-	gitHandler := gitserver.NewHandler(conn, gitService, gitAuthService)
+	gitHandler := gitserver.NewHandler(deps.DB, deps.Git, deps.GitCredentialVerifier)
 	r.NoRoute(gitHandler.Handle)
 
-	s := &http.Server{
-		Handler:           r,
-		Addr:              "0.0.0.0:" + port,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-
-	return s, nil
+	return r
 }
 
 func (s *Server) Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error) {

@@ -24,15 +24,19 @@ generate:
 
 lint:
 	golangci-lint run
-	cd web && bun run lint
+	bun run --cwd web lint
 
 test:
-	go test -v -coverprofile=coverage.out ./...
+	go test -v -coverprofile=coverage.out -cover ./...
+	bun run --cwd web test
+
+test-cover:
+	go tool cover -func=coverage.out
 
 format:
 	go fmt ./...
 	golangci-lint fmt
-	cd web && bun run format
+	bun run --cwd web format
 
 check: lint test
 
@@ -56,7 +60,7 @@ dev-api:
 	go tool wgo run cmd/api/api.go
 
 dev-web:
-	cd web && bun run dev
+	bun run --cwd web dev
 
 dev-db:
 	docker compose -f deployments/dev.docker-compose.yml up -d db

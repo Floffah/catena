@@ -45,6 +45,10 @@ func (p GitPrincipal) HasScope(scope string) bool {
 	return false
 }
 
+type TokenIssuer interface {
+	CreateToken(context.Context, db.User, string, []string, *time.Time) (string, db.GitAccessToken, error)
+}
+
 type Service struct {
 	repository db.Queries
 }
