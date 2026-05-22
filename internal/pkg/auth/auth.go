@@ -24,7 +24,14 @@ var (
 	ClerkFrontendApiUrl string
 )
 
-type AuthService struct {
+type Provider interface {
+	Middleware() gin.HandlerFunc
+	GetAuthFromContext(context.Context) (*Auth, error)
+	GetUserFromAuth(context.Context, *Auth) (db.User, error)
+	CreateClerkSignInToken(*Auth) (string, error)
+}
+
+type Service struct {
 	repository       db.Queries
 	ClerkJwks        *jwks.Client
 	ClerkUser        *user.Client
@@ -35,14 +42,14 @@ type Auth struct {
 	ClerkUserID string
 }
 
-func NewAuthService(clerkSecretKey string, conn db.DBTX) *AuthService {
+func NewAuthService(clerkSecretKey string, conn db.DBTX) *Service {
 	clerkConf := &clerk.ClientConfig{}
 	clerkConf.Key = &clerkSecretKey
 	clerkJwks := jwks.NewClient(clerkConf)
 	clerkUser := user.NewClient(clerkConf)
 	clerkSIT := signintoken.NewClient(clerkConf)
 
-	return &AuthService{
+	return &Service{
 		repository:       *db.New(conn),
 		ClerkJwks:        clerkJwks,
 		ClerkUser:        clerkUser,
@@ -50,7 +57,7 @@ func NewAuthService(clerkSecretKey string, conn db.DBTX) *AuthService {
 	}
 }
 
-func (s *AuthService) GetAuthFromContext(ctx context.Context) (*Auth, error) {
+func (s *Service) GetAuthFromContext(ctx context.Context) (*Auth, error) {
 	ginCtx, okCtx := ctx.(*gin.Context)
 	if okCtx {
 		cachedAuth, exists := ginCtx.Get(AuthContextKey)
@@ -69,7 +76,7 @@ func (s *AuthService) GetAuthFromContext(ctx context.Context) (*Auth, error) {
 	return nil, nil
 }
 
-func (s *AuthService) GetUserFromAuth(ctx context.Context, auth *Auth) (db.User, error) {
+func (s *Service) GetUserFromAuth(ctx context.Context, auth *Auth) (db.User, error) {
 	if auth == nil {
 		return db.User{}, nil
 	}
@@ -137,7 +144,7 @@ func (s *AuthService) GetUserFromAuth(ctx context.Context, auth *Auth) (db.User,
 	return newUser, nil
 }
 
-func (s *AuthService) Middleware() gin.HandlerFunc {
+func (s *Service) Middleware() gin.HandlerFunc {
 	clerkMiddleware := clerkhttp.WithHeaderAuthorization(
 		clerkhttp.JWKSClient(s.ClerkJwks),
 		clerkhttp.AuthorizationJWTExtractor(func(r *http.Request) string {
@@ -177,7 +184,7 @@ func (s *AuthService) Middleware() gin.HandlerFunc {
 	}
 }
 
-func (s *AuthService) CreateClerkSignInToken(auth *Auth) (string, error) {
+func (s *Service) CreateClerkSignInToken(auth *Auth) (string, error) {
 	signInToken, err := s.ClerkSignInToken.Create(context.Background(), &signintoken.CreateParams{
 		UserID:           &auth.ClerkUserID,
 		ExpiresInSeconds: new(int64(20)),

@@ -111,7 +111,7 @@ func (s *Server) CreateGitAccessToken(ctx context.Context, request CreateGitAcce
 		}, nil
 	}
 
-	rawToken, token, err := s.gitAuth.CreateToken(ctx, user, name, scopes, request.Body.ExpiresAt)
+	rawToken, token, err := s.gitTokens.CreateToken(ctx, user, name, scopes, request.Body.ExpiresAt)
 	if err != nil {
 		if errors.Is(err, gitauth.ErrInvalidScope) {
 			return CreateGitAccessToken400JSONResponse{

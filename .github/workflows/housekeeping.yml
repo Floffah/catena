@@ -55,4 +55,4 @@ jobs:
         with:
           test-results: test.json
           package-name: github.com/floffah/catena
-      - run: bun test
+      - run: bun run --cwd web test
