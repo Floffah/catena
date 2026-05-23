@@ -16,6 +16,7 @@ Links:
 - [Roadmap](#roadmap)
 - [Goals](#goals)
 - [Deployment](#deployment)
+- [Future architecture](#future-architecture)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -180,3 +181,44 @@ Currently the official production instance is deployed on Railway so a Railway t
 
 An example of a potential railway setup using all of the above components and puzzle pieces is:
 ![Example Railway Setup](./assets/railway-diagram.png)
+
+The current infrastructure shape is roughly:
+
+```mermaid
+C4Container
+title Catena Current Infrastructure
+
+Person(developer, "Developer", "Browses repositories, manages account settings, and uses Git.")
+System_Ext(gitClient, "Git client", "git CLI or compatible Git client.")
+System_Ext(clerk, "Clerk", "Hosted authentication, sessions, and user profile management.")
+
+System_Boundary(catena, "Catena") {
+    Container(proxy, "Caddy reverse proxy", "Caddy", "Single public entrypoint for web, API, and Git-over-HTTP traffic.")
+    Container(web, "Frontend", "Next.js standalone server", "Renders the web UI, handles SSR, and integrates Clerk on the product surface.")
+    Container(api, "Backend", "Go API and Git HTTP server", "Serves the OpenAPI product API and Git smart HTTP using git-http-backend.")
+    ContainerDb(postgres, "Postgres", "Postgres 18+", "Stores users, repositories, issues, access tokens, and product metadata.")
+    ContainerDb(gitVolume, "Git repository volume", "Persistent filesystem volume", "Stores filesystem-backed bare Git repositories.")
+}
+
+Rel(developer, proxy, "Browses Catena", "HTTPS")
+Rel(developer, gitClient, "Runs clone, fetch, and push commands")
+Rel(gitClient, proxy, "Uses https://oncatena.com/{owner}/{repo}", "Git smart HTTP")
+
+Rel(proxy, web, "Routes normal web pages", "HTTP")
+Rel(proxy, api, "Routes /v1/* API and Git repository paths", "HTTP")
+
+Rel(web, api, "Fetches product data during SSR and client interactions", "HTTP/JSON")
+Rel(web, clerk, "Authenticates users and manages account UI", "Clerk SDK")
+
+Rel(api, clerk, "Verifies authenticated sessions", "Clerk middleware/JWKS")
+Rel(api, postgres, "Reads and writes product data", "pgx/sqlc")
+Rel(api, gitVolume, "Creates, reads, clones, fetches, and pushes bare repositories", "Git binary and git-http-backend")
+```
+
+## Future architecture
+
+A crude diagram of what the architecture would likely evolve into should Catena's userbase grow significantly and require scaling beyond a single backend instance[^1]:
+
+![Future Architecture](./assets/future-architecture.png)
+
+[^1]: Excludes monitoring for simplicity
