@@ -40,4 +40,5 @@ select
 from repository_items
 join issues on issues.repository_item_id = repository_items.id
 where repository_items.repository_id = $1
-order by repository_items.last_activity_at desc, repository_items.number desc;
+order by repository_items.last_activity_at desc, repository_items.number desc
+limit sqlc.arg(result_limit);

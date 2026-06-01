@@ -108,6 +108,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/users/name/{name}/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List User Repositories
+         * @description List repositories owned by a user. Anonymous requests only include public repositories. The owner can also see their private repositories when authenticated.
+         */
+        get: operations["listUserRepositoriesByName"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/clerk/sign-in-token": {
         parameters: {
             query?: never;
@@ -431,6 +451,11 @@ export interface components {
             visibility?: components["schemas"]["RepositoryVisibility"];
             defaultBranch?: string;
         };
+        ListRepositoriesResponse: {
+            repositories: components["schemas"]["Repository"][];
+        };
+        /** @enum {string} */
+        RepositoryListSort: "featured" | "updated";
         Error: {
             error: string;
         };
@@ -694,6 +719,7 @@ export interface components {
             id: string;
             name: string;
             displayName?: string | null;
+            description?: string | null;
             avatarUrl?: string | null;
             /** Format: email */
             email?: string | null;
@@ -704,6 +730,7 @@ export interface components {
         };
         UpdateAuthenticatedUserRequest: {
             displayName?: string;
+            description?: string;
         };
     };
     responses: {
@@ -780,6 +807,10 @@ export type SchemaCreateRepositoryResponse =
     components["schemas"]["CreateRepositoryResponse"];
 export type SchemaUpdateRepositoryRequest =
     components["schemas"]["UpdateRepositoryRequest"];
+export type SchemaListRepositoriesResponse =
+    components["schemas"]["ListRepositoriesResponse"];
+export type SchemaRepositoryListSort =
+    components["schemas"]["RepositoryListSort"];
 export type SchemaError = components["schemas"]["Error"];
 export type SchemaGitAccessToken = components["schemas"]["GitAccessToken"];
 export type SchemaRepository = components["schemas"]["Repository"];
@@ -983,6 +1014,38 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    listUserRepositoriesByName: {
+        parameters: {
+            query?: {
+                /** @description Repository ordering. Defaults to `updated`. `featured` currently uses the same ordering as `updated` until repository pinning and metrics exist. */
+                sort?: components["schemas"]["RepositoryListSort"];
+                /** @description Maximum number of repositories to return. Defaults to 50. */
+                limit?: number;
+                /** @description Repository visibility to include. When omitted, the response includes every repository the requester can view. */
+                visibility?: components["schemas"]["RepositoryVisibility"];
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListRepositoriesResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     createClerkSignInToken: {
         parameters: {
             query?: never;
@@ -1165,7 +1228,10 @@ export interface operations {
     };
     listRepositoryIssues: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Maximum number of issues to return. Defaults to 50. */
+                limit?: number;
+            };
             header?: never;
             path: {
                 owner: string;
@@ -1184,6 +1250,7 @@ export interface operations {
                     "application/json": components["schemas"]["ListIssuesResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];

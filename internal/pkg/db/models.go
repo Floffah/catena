@@ -219,4 +219,5 @@ type User struct {
 	Email       string
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
+	Description *string
 }

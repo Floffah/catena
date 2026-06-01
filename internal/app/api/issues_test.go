@@ -34,7 +34,7 @@ func TestListRepositoryIssues(t *testing.T) {
 
 	expectRepositoryByOwnerAndName(mock, user.Name, repository.Name, repository)
 	mock.ExpectQuery("select (.+) from repository_items").
-		WithArgs(repository.ID).
+		WithArgs(repository.ID, int32(maxListLimit)).
 		WillReturnRows(issueRows().AddRow(
 			UUIDToPgtype(issueID),
 			repository.ID,
@@ -68,6 +68,25 @@ func TestListRepositoryIssues(t *testing.T) {
 	assert.That(t, body.Issues[0].Reference == "I-1")
 	assert.That(t, body.Issues[0].Status == IssueStatusOpen)
 	assert.That(t, body.Issues[0].Title == "First issue")
+}
+
+func TestListRepositoryIssuesInvalidLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := NewRouter(ServerDeps{
+		DB:   failDB{t: t},
+		Auth: testAuthProvider{},
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/repositories/floffah/catena/issues?limit=51", nil)
+
+	router.ServeHTTP(response, request)
+
+	assert.That(t, response.Code == http.StatusBadRequest)
+
+	var body BadRequestJSONResponse
+	assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+	assert.That(t, body.Error == "limit must be between 1 and 50")
 }
 
 func TestCreateRepositoryIssue(t *testing.T) {

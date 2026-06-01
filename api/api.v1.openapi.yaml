@@ -153,6 +153,57 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  "/v1/users/name/{name}/repositories":
+    get:
+      tags:
+        - v1
+      summary: List User Repositories
+      description: List repositories owned by a user. Anonymous requests only include public repositories. The owner can also see their private repositories when authenticated.
+      operationId: listUserRepositoriesByName
+      security:
+        - { }
+        - bearerAuth: [ ]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          description: Repository ordering. Defaults to `updated`. `featured` currently uses the same ordering as `updated` until repository pinning and metrics exist.
+          schema:
+            $ref: "#/components/schemas/RepositoryListSort"
+            default: updated
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of repositories to return. Defaults to 50.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 50
+        - name: visibility
+          in: query
+          required: false
+          description: Repository visibility to include. When omitted, the response includes every repository the requester can view.
+          schema:
+            $ref: "#/components/schemas/RepositoryVisibility"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRepositoriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   "/v1/auth/clerk/sign-in-token":
     post:
       tags:
@@ -362,6 +413,15 @@ paths:
           required: true
           schema:
             type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of issues to return. Defaults to 50.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 50
       responses:
         "200":
           description: OK
@@ -369,6 +429,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListIssuesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -821,6 +883,20 @@ components:
           $ref: "#/components/schemas/RepositoryVisibility"
         defaultBranch:
           type: string
+    ListRepositoriesResponse:
+      type: object
+      required:
+        - repositories
+      properties:
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Repository"
+    RepositoryListSort:
+      type: string
+      enum:
+        - featured
+        - updated
     Error:
       type: object
       required:
@@ -1398,6 +1474,9 @@ components:
         displayName:
           type: string
           nullable: true
+        description:
+          type: string
+          nullable: true
         avatarUrl:
           type: string
           nullable: true
@@ -1415,6 +1494,8 @@ components:
       type: object
       properties:
         displayName:
+          type: string
+        description:
           type: string
   responses:
     BadRequest:

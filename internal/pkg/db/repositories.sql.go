@@ -124,6 +124,146 @@ func (q *Queries) GetRepositoryByOwnerAndName(ctx context.Context, arg GetReposi
 	return i, err
 }
 
+const listRepositoriesByOwnerFeatured = `-- name: ListRepositoriesByOwnerFeatured :many
+select id, owner_id, name, description, visibility, default_branch, created_at, updated_at, item_prefix, next_item_number
+from repositories
+where owner_id = $1
+  and (
+    (
+      not $2::boolean
+      and (
+        visibility = 'public'
+        or $3::boolean
+      )
+    )
+    or (
+      $2::boolean
+      and visibility = $4::repository_visibility
+      and (
+        visibility = 'public'
+        or $3::boolean
+      )
+    )
+  )
+order by updated_at desc, name asc
+limit $5
+`
+
+type ListRepositoriesByOwnerFeaturedParams struct {
+	OwnerID          pgtype.UUID
+	FilterVisibility bool
+	IncludePrivate   bool
+	Visibility       RepositoryVisibility
+	ResultLimit      int32
+}
+
+func (q *Queries) ListRepositoriesByOwnerFeatured(ctx context.Context, arg ListRepositoriesByOwnerFeaturedParams) ([]Repository, error) {
+	rows, err := q.db.Query(ctx, listRepositoriesByOwnerFeatured,
+		arg.OwnerID,
+		arg.FilterVisibility,
+		arg.IncludePrivate,
+		arg.Visibility,
+		arg.ResultLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Repository
+	for rows.Next() {
+		var i Repository
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.Name,
+			&i.Description,
+			&i.Visibility,
+			&i.DefaultBranch,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ItemPrefix,
+			&i.NextItemNumber,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRepositoriesByOwnerUpdated = `-- name: ListRepositoriesByOwnerUpdated :many
+select id, owner_id, name, description, visibility, default_branch, created_at, updated_at, item_prefix, next_item_number
+from repositories
+where owner_id = $1
+  and (
+    (
+      not $2::boolean
+      and (
+        visibility = 'public'
+        or $3::boolean
+      )
+    )
+    or (
+      $2::boolean
+      and visibility = $4::repository_visibility
+      and (
+        visibility = 'public'
+        or $3::boolean
+      )
+    )
+  )
+order by updated_at desc, name asc
+limit $5
+`
+
+type ListRepositoriesByOwnerUpdatedParams struct {
+	OwnerID          pgtype.UUID
+	FilterVisibility bool
+	IncludePrivate   bool
+	Visibility       RepositoryVisibility
+	ResultLimit      int32
+}
+
+func (q *Queries) ListRepositoriesByOwnerUpdated(ctx context.Context, arg ListRepositoriesByOwnerUpdatedParams) ([]Repository, error) {
+	rows, err := q.db.Query(ctx, listRepositoriesByOwnerUpdated,
+		arg.OwnerID,
+		arg.FilterVisibility,
+		arg.IncludePrivate,
+		arg.Visibility,
+		arg.ResultLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Repository
+	for rows.Next() {
+		var i Repository
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.Name,
+			&i.Description,
+			&i.Visibility,
+			&i.DefaultBranch,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ItemPrefix,
+			&i.NextItemNumber,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateRepository = `-- name: UpdateRepository :one
 update repositories
 set

@@ -3,7 +3,7 @@
         "web"
     ],
     "devDependencies": {
-        "@colbymchenry/codegraph": "^0.8.0",
+        "@colbymchenry/codegraph": "^0.9.7",
         "@trivago/prettier-plugin-sort-imports": "^6.0.2",
         "doctoc": "^2.4.1",
         "prettier": "^3.8.3",

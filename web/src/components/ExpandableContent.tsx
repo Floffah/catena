@@ -1,6 +1,7 @@
 "use client";
 
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { motion } from "motion/react";
 import { PropsWithChildren, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -50,10 +51,14 @@ export default function ExpandableContent({
             <div
                 ref={contentRef}
                 className={cn(
-                    "overflow-hidden transition-[max-height] duration-300 ease-out",
+                    "overflow-hidden transition-[max-height] duration-300 ease-out interpolate-allow",
                     expanded && "max-h-none",
                 )}
-                style={expanded ? undefined : { maxHeight: collapsedHeight }}
+                style={
+                    expanded
+                        ? { maxHeight: "max-content" }
+                        : { maxHeight: collapsedHeight }
+                }
             >
                 {children}
             </div>
