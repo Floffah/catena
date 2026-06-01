@@ -190,7 +190,13 @@ paths:
           required: false
           description: Repository visibility to include. When omitted, the response includes every repository the requester can view.
           schema:
-            $ref: "#/components/schemas/RepositoryVisibility"
+            type: string
+            enum:
+              - private
+              - public
+            x-enum-varnames:
+              - ListUserRepositoriesByNameParamsVisibilityPrivate
+              - ListUserRepositoriesByNameParamsVisibilityPublic
       responses:
         "200":
           description: OK

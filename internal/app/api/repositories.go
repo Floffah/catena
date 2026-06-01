@@ -204,20 +204,11 @@ func (s *Server) ListUserRepositoriesByName(ctx context.Context, request ListUse
 
 	includePrivate := false
 	authUser, err := s.auth.GetAuthFromContext(ctx)
-	if err != nil {
-		return ListUserRepositoriesByName500JSONResponse{
-			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load auth user"},
-		}, nil
-	}
-	if authUser != nil {
+	if err == nil && authUser != nil {
 		user, err := s.auth.GetUserFromAuth(ctx, authUser)
-		if err != nil {
-			return ListUserRepositoriesByName500JSONResponse{
-				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
-			}, nil
+		if err == nil {
+			includePrivate = user.ID.Valid && user.ID == owner.ID
 		}
-
-		includePrivate = user.ID.Valid && user.ID == owner.ID
 	}
 
 	var repositories []db.Repository

@@ -285,6 +285,24 @@ func (e ResolvedRepositoryGitPathPathType) Valid() bool {
 	}
 }
 
+// Defines values for ListUserRepositoriesByNameParamsVisibility.
+const (
+	ListUserRepositoriesByNameParamsVisibilityPrivate ListUserRepositoriesByNameParamsVisibility = "private"
+	ListUserRepositoriesByNameParamsVisibilityPublic  ListUserRepositoriesByNameParamsVisibility = "public"
+)
+
+// Valid indicates whether the value is a known member of the ListUserRepositoriesByNameParamsVisibility enum.
+func (e ListUserRepositoriesByNameParamsVisibility) Valid() bool {
+	switch e {
+	case ListUserRepositoriesByNameParamsVisibilityPrivate:
+		return true
+	case ListUserRepositoriesByNameParamsVisibilityPublic:
+		return true
+	default:
+		return false
+	}
+}
+
 // CreateClerkSignInTokenResponse defines model for CreateClerkSignInTokenResponse.
 type CreateClerkSignInTokenResponse struct {
 	Token string `json:"token"`
@@ -723,8 +741,11 @@ type ListUserRepositoriesByNameParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
 	// Visibility Repository visibility to include. When omitted, the response includes every repository the requester can view.
-	Visibility *RepositoryVisibility `form:"visibility,omitempty" json:"visibility,omitempty"`
+	Visibility *ListUserRepositoriesByNameParamsVisibility `form:"visibility,omitempty" json:"visibility,omitempty"`
 }
+
+// ListUserRepositoriesByNameParamsVisibility defines parameters for ListUserRepositoriesByName.
+type ListUserRepositoriesByNameParamsVisibility string
 
 // CreateGitAccessTokenJSONRequestBody defines body for CreateGitAccessToken for application/json ContentType.
 type CreateGitAccessTokenJSONRequestBody = CreateGitAccessTokenRequest

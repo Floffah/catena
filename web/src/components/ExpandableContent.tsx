@@ -1,7 +1,6 @@
 "use client";
 
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
-import { motion } from "motion/react";
 import { PropsWithChildren, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";

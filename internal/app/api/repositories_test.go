@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -314,6 +315,93 @@ func TestListUserRepositoriesByName(t *testing.T) {
 		router := NewRouter(ServerDeps{
 			DB:   mock,
 			Auth: testAuthProvider{user: otherUser},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories", nil)
+		request.Header.Set("Authorization", "Bearer "+testBearerToken)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 1)
+		assert.That(t, body.Repositories[0].Id == publicRepositoryID)
+		assert.That(t, body.Repositories[0].Visibility == Public)
+	})
+
+	t.Run("auth context failure falls back to public repositories", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, false, false, db.RepositoryVisibilityPublic, int32(maxListLimit)).
+			WillReturnRows(repositoryRows().AddRow(
+				publicRepository.ID,
+				publicRepository.OwnerID,
+				publicRepository.Name,
+				publicRepository.Description,
+				publicRepository.Visibility,
+				publicRepository.DefaultBranch,
+				publicRepository.CreatedAt,
+				publicRepository.UpdatedAt,
+				publicRepository.ItemPrefix,
+				publicRepository.NextItemNumber,
+			))
+
+		router := NewRouter(ServerDeps{
+			DB: mock,
+			Auth: testAuthProvider{
+				user:    user,
+				authErr: errors.New("stale auth context"),
+			},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 1)
+		assert.That(t, body.Repositories[0].Id == publicRepositoryID)
+		assert.That(t, body.Repositories[0].Visibility == Public)
+	})
+
+	t.Run("user lookup failure falls back to public repositories", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, false, false, db.RepositoryVisibilityPublic, int32(maxListLimit)).
+			WillReturnRows(repositoryRows().AddRow(
+				publicRepository.ID,
+				publicRepository.OwnerID,
+				publicRepository.Name,
+				publicRepository.Description,
+				publicRepository.Visibility,
+				publicRepository.DefaultBranch,
+				publicRepository.CreatedAt,
+				publicRepository.UpdatedAt,
+				publicRepository.ItemPrefix,
+				publicRepository.NextItemNumber,
+			))
+
+		router := NewRouter(ServerDeps{
+			DB: mock,
+			Auth: testAuthProvider{
+				user:    user,
+				userErr: errors.New("partially provisioned user"),
+			},
 		})
 		response := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories", nil)

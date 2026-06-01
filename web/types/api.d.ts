@@ -1022,7 +1022,7 @@ export interface operations {
                 /** @description Maximum number of repositories to return. Defaults to 50. */
                 limit?: number;
                 /** @description Repository visibility to include. When omitted, the response includes every repository the requester can view. */
-                visibility?: components["schemas"]["RepositoryVisibility"];
+                visibility?: "private" | "public";
             };
             header?: never;
             path: {

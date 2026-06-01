@@ -15,7 +15,9 @@ import (
 const testBearerToken = "test-user"
 
 type testAuthProvider struct {
-	user db.User
+	user    db.User
+	authErr error
+	userErr error
 }
 
 func (p testAuthProvider) Middleware() gin.HandlerFunc {
@@ -29,6 +31,10 @@ func (p testAuthProvider) Middleware() gin.HandlerFunc {
 }
 
 func (p testAuthProvider) GetAuthFromContext(ctx context.Context) (*auth.Auth, error) {
+	if p.authErr != nil {
+		return nil, p.authErr
+	}
+
 	ginCtx, ok := ctx.(*gin.Context)
 	if !ok {
 		return nil, nil
@@ -48,6 +54,10 @@ func (p testAuthProvider) GetAuthFromContext(ctx context.Context) (*auth.Auth, e
 }
 
 func (p testAuthProvider) GetUserFromAuth(_ context.Context, authUser *auth.Auth) (db.User, error) {
+	if p.userErr != nil {
+		return db.User{}, p.userErr
+	}
+
 	if authUser == nil || authUser.ClerkUserID != p.user.ClerkUserID {
 		return db.User{}, nil
 	}
