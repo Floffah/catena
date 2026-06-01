@@ -25,7 +25,7 @@ insert into users (
   $4,
   $5
 )
-returning id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at
+returning id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at, description
 `
 
 type CreateUserParams struct {
@@ -54,6 +54,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
 	)
 	return i, err
 }
@@ -69,7 +70,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getUserByClerkUserID = `-- name: GetUserByClerkUserID :one
-select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at from users
+select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at, description from users
 where clerk_user_id = $1
 `
 
@@ -85,12 +86,13 @@ func (q *Queries) GetUserByClerkUserID(ctx context.Context, clerkUserID string) 
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at from users
+select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at, description from users
 where id = $1
 `
 
@@ -106,12 +108,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
 	)
 	return i, err
 }
 
 const getUserByName = `-- name: GetUserByName :one
-select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at from users
+select id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at, description from users
 where name = $1
 `
 
@@ -127,6 +130,7 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (User, error) 
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
 	)
 	return i, err
 }
@@ -136,9 +140,10 @@ update users
 set
   name = $2,
   display_name = $3,
-  avatar_url = $4
+  avatar_url = $4,
+  description = $5
 where id = $1
-returning id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at
+returning id, clerk_user_id, name, display_name, avatar_url, email, created_at, updated_at, description
 `
 
 type UpdateUserProfileParams struct {
@@ -146,6 +151,7 @@ type UpdateUserProfileParams struct {
 	Name        string
 	DisplayName *string
 	AvatarUrl   *string
+	Description *string
 }
 
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
@@ -154,6 +160,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		arg.Name,
 		arg.DisplayName,
 		arg.AvatarUrl,
+		arg.Description,
 	)
 	var i User
 	err := row.Scan(
@@ -165,6 +172,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
 	)
 	return i, err
 }

@@ -189,6 +189,24 @@ func (e RepositoryItemTitleChangedTimelinePayloadType) Valid() bool {
 	}
 }
 
+// Defines values for RepositoryListSort.
+const (
+	Featured RepositoryListSort = "featured"
+	Updated  RepositoryListSort = "updated"
+)
+
+// Valid indicates whether the value is a known member of the RepositoryListSort enum.
+func (e RepositoryListSort) Valid() bool {
+	switch e {
+	case Featured:
+		return true
+	case Updated:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RepositoryRefType.
 const (
 	Branch RepositoryRefType = "branch"
@@ -261,6 +279,24 @@ func (e ResolvedRepositoryGitPathPathType) Valid() bool {
 	case ResolvedRepositoryGitPathPathTypeRoot:
 		return true
 	case ResolvedRepositoryGitPathPathTypeTree:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUserRepositoriesByNameParamsVisibility.
+const (
+	ListUserRepositoriesByNameParamsVisibilityPrivate ListUserRepositoriesByNameParamsVisibility = "private"
+	ListUserRepositoriesByNameParamsVisibilityPublic  ListUserRepositoriesByNameParamsVisibility = "public"
+)
+
+// Valid indicates whether the value is a known member of the ListUserRepositoriesByNameParamsVisibility enum.
+func (e ListUserRepositoriesByNameParamsVisibility) Valid() bool {
+	switch e {
+	case ListUserRepositoriesByNameParamsVisibilityPrivate:
+		return true
+	case ListUserRepositoriesByNameParamsVisibilityPublic:
 		return true
 	default:
 		return false
@@ -373,6 +409,11 @@ type Label struct {
 // ListIssuesResponse defines model for ListIssuesResponse.
 type ListIssuesResponse struct {
 	Issues []Issue `json:"issues"`
+}
+
+// ListRepositoriesResponse defines model for ListRepositoriesResponse.
+type ListRepositoriesResponse struct {
+	Repositories []Repository `json:"repositories"`
 }
 
 // ListRepositoryRefsResponse defines model for ListRepositoryRefsResponse.
@@ -528,6 +569,9 @@ type RepositoryLatestCommit struct {
 	ShortOid        string    `json:"shortOid"`
 }
 
+// RepositoryListSort defines model for RepositoryListSort.
+type RepositoryListSort string
+
 // RepositoryReadme defines model for RepositoryReadme.
 type RepositoryReadme struct {
 	CommitOid string `json:"commitOid"`
@@ -587,6 +631,7 @@ type ResolvedRepositoryGitPathPathType string
 
 // UpdateAuthenticatedUserRequest defines model for UpdateAuthenticatedUserRequest.
 type UpdateAuthenticatedUserRequest struct {
+	Description *string `json:"description,omitempty"`
 	DisplayName *string `json:"displayName,omitempty"`
 }
 
@@ -601,6 +646,7 @@ type UpdateRepositoryRequest struct {
 type User struct {
 	AvatarUrl   *string              `json:"avatarUrl,omitempty"`
 	CreatedAt   time.Time            `json:"createdAt"`
+	Description *string              `json:"description,omitempty"`
 	DisplayName *string              `json:"displayName,omitempty"`
 	Email       *openapi_types.Email `json:"email,omitempty"`
 	Id          openapi_types.UUID   `json:"id"`
@@ -647,6 +693,12 @@ type ResolveRepositoryGitPathParams struct {
 	Path string `form:"path" json:"path"`
 }
 
+// ListRepositoryIssuesParams defines parameters for ListRepositoryIssues.
+type ListRepositoryIssuesParams struct {
+	// Limit Maximum number of issues to return. Defaults to 50.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // GetRepositoryLatestCommitParams defines parameters for GetRepositoryLatestCommit.
 type GetRepositoryLatestCommitParams struct {
 	// Ref Branch, tag, or commit to read from. Defaults to the repository default branch.
@@ -679,6 +731,21 @@ type GetRepositoryTreeParams struct {
 	// Path Directory path to list. Defaults to the repository root.
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
 }
+
+// ListUserRepositoriesByNameParams defines parameters for ListUserRepositoriesByName.
+type ListUserRepositoriesByNameParams struct {
+	// Sort Repository ordering. Defaults to `updated`. `featured` currently uses the same ordering as `updated` until repository pinning and metrics exist.
+	Sort *RepositoryListSort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Limit Maximum number of repositories to return. Defaults to 50.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Visibility Repository visibility to include. When omitted, the response includes every repository the requester can view.
+	Visibility *ListUserRepositoriesByNameParamsVisibility `form:"visibility,omitempty" json:"visibility,omitempty"`
+}
+
+// ListUserRepositoriesByNameParamsVisibility defines parameters for ListUserRepositoriesByName.
+type ListUserRepositoriesByNameParamsVisibility string
 
 // CreateGitAccessTokenJSONRequestBody defines body for CreateGitAccessToken for application/json ContentType.
 type CreateGitAccessTokenJSONRequestBody = CreateGitAccessTokenRequest
@@ -938,7 +1005,7 @@ type ServerInterface interface {
 	ResolveRepositoryGitPath(c *gin.Context, owner string, repository string, params ResolveRepositoryGitPathParams)
 	// List Repository Issues
 	// (GET /v1/repositories/{owner}/{repository}/issues)
-	ListRepositoryIssues(c *gin.Context, owner string, repository string)
+	ListRepositoryIssues(c *gin.Context, owner string, repository string, params ListRepositoryIssuesParams)
 	// Create Repository Issue
 	// (POST /v1/repositories/{owner}/{repository}/issues)
 	CreateRepositoryIssue(c *gin.Context, owner string, repository string)
@@ -969,6 +1036,9 @@ type ServerInterface interface {
 	// Get User By Name
 	// (GET /v1/users/name/{name})
 	GetUserByName(c *gin.Context, name string)
+	// List User Repositories
+	// (GET /v1/users/name/{name}/repositories)
+	ListUserRepositoriesByName(c *gin.Context, name string, params ListUserRepositoriesByNameParams)
 	// Version
 	// (GET /v1/version)
 	Version(c *gin.Context)
@@ -1291,6 +1361,17 @@ func (siw *ServerInterfaceWrapper) ListRepositoryIssues(c *gin.Context) {
 
 	c.Set(BearerAuthScopes, []string{})
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRepositoryIssuesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", c.Request.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -1298,7 +1379,7 @@ func (siw *ServerInterfaceWrapper) ListRepositoryIssues(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.ListRepositoryIssues(c, owner, repository)
+	siw.Handler.ListRepositoryIssues(c, owner, repository, params)
 }
 
 // CreateRepositoryIssue operation middleware
@@ -1668,6 +1749,59 @@ func (siw *ServerInterfaceWrapper) GetUserByName(c *gin.Context) {
 	siw.Handler.GetUserByName(c, name)
 }
 
+// ListUserRepositoriesByName operation middleware
+func (siw *ServerInterfaceWrapper) ListUserRepositoriesByName(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", c.Param("name"), &name, runtime.BindStyledParameterOptions{Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter name: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUserRepositoriesByNameParams
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", c.Request.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sort: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", c.Request.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "visibility" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "visibility", c.Request.URL.Query(), &params.Visibility, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter visibility: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListUserRepositoriesByName(c, name, params)
+}
+
 // Version operation middleware
 func (siw *ServerInterfaceWrapper) Version(c *gin.Context) {
 
@@ -1729,6 +1863,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PATCH(options.BaseURL+"/v1/user", wrapper.UpdateAuthenticatedUser)
 	router.GET(options.BaseURL+"/v1/users/clerk/:clerkUserId", wrapper.GetUserByClerkUserId)
 	router.GET(options.BaseURL+"/v1/users/name/:name", wrapper.GetUserByName)
+	router.GET(options.BaseURL+"/v1/users/name/:name/repositories", wrapper.ListUserRepositoriesByName)
 	router.GET(options.BaseURL+"/v1/version", wrapper.Version)
 }
 
@@ -2210,6 +2345,7 @@ func (response ResolveRepositoryGitPath500JSONResponse) VisitResolveRepositoryGi
 type ListRepositoryIssuesRequestObject struct {
 	Owner      string `json:"owner"`
 	Repository string `json:"repository"`
+	Params     ListRepositoryIssuesParams
 }
 
 type ListRepositoryIssuesResponseObject interface {
@@ -2221,6 +2357,15 @@ type ListRepositoryIssues200JSONResponse ListIssuesResponse
 func (response ListRepositoryIssues200JSONResponse) VisitListRepositoryIssuesResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListRepositoryIssues400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListRepositoryIssues400JSONResponse) VisitListRepositoryIssuesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -2770,6 +2915,53 @@ func (response GetUserByName500JSONResponse) VisitGetUserByNameResponse(w http.R
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListUserRepositoriesByNameRequestObject struct {
+	Name   string `json:"name"`
+	Params ListUserRepositoriesByNameParams
+}
+
+type ListUserRepositoriesByNameResponseObject interface {
+	VisitListUserRepositoriesByNameResponse(w http.ResponseWriter) error
+}
+
+type ListUserRepositoriesByName200JSONResponse ListRepositoriesResponse
+
+func (response ListUserRepositoriesByName200JSONResponse) VisitListUserRepositoriesByNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListUserRepositoriesByName400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListUserRepositoriesByName400JSONResponse) VisitListUserRepositoriesByNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListUserRepositoriesByName404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListUserRepositoriesByName404JSONResponse) VisitListUserRepositoriesByNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListUserRepositoriesByName500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response ListUserRepositoriesByName500JSONResponse) VisitListUserRepositoriesByNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type VersionRequestObject struct {
 }
 
@@ -2851,6 +3043,9 @@ type StrictServerInterface interface {
 	// Get User By Name
 	// (GET /v1/users/name/{name})
 	GetUserByName(ctx context.Context, request GetUserByNameRequestObject) (GetUserByNameResponseObject, error)
+	// List User Repositories
+	// (GET /v1/users/name/{name}/repositories)
+	ListUserRepositoriesByName(ctx context.Context, request ListUserRepositoriesByNameRequestObject) (ListUserRepositoriesByNameResponseObject, error)
 	// Version
 	// (GET /v1/version)
 	Version(ctx context.Context, request VersionRequestObject) (VersionResponseObject, error)
@@ -3159,11 +3354,12 @@ func (sh *strictHandler) ResolveRepositoryGitPath(ctx *gin.Context, owner string
 }
 
 // ListRepositoryIssues operation middleware
-func (sh *strictHandler) ListRepositoryIssues(ctx *gin.Context, owner string, repository string) {
+func (sh *strictHandler) ListRepositoryIssues(ctx *gin.Context, owner string, repository string, params ListRepositoryIssuesParams) {
 	var request ListRepositoryIssuesRequestObject
 
 	request.Owner = owner
 	request.Repository = repository
+	request.Params = params
 
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
 		return sh.ssi.ListRepositoryIssues(ctx, request.(ListRepositoryIssuesRequestObject))
@@ -3472,6 +3668,34 @@ func (sh *strictHandler) GetUserByName(ctx *gin.Context, name string) {
 		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(GetUserByNameResponseObject); ok {
 		if err := validResponse.VisitGetUserByNameResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListUserRepositoriesByName operation middleware
+func (sh *strictHandler) ListUserRepositoriesByName(ctx *gin.Context, name string, params ListUserRepositoriesByNameParams) {
+	var request ListUserRepositoriesByNameRequestObject
+
+	request.Name = name
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUserRepositoriesByName(ctx, request.(ListUserRepositoriesByNameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUserRepositoriesByName")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(ListUserRepositoriesByNameResponseObject); ok {
+		if err := validResponse.VisitListUserRepositoriesByNameResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {

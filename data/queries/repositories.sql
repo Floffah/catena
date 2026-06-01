@@ -25,6 +25,54 @@ join users on users.id = repositories.owner_id
 where users.name = sqlc.arg(owner_name)
   and repositories.name = sqlc.arg(repository_name);
 
+-- name: ListRepositoriesByOwnerUpdated :many
+select *
+from repositories
+where owner_id = sqlc.arg(owner_id)
+  and (
+    (
+      not sqlc.arg(filter_visibility)::boolean
+      and (
+        visibility = 'public'
+        or sqlc.arg(include_private)::boolean
+      )
+    )
+    or (
+      sqlc.arg(filter_visibility)::boolean
+      and visibility = sqlc.arg(visibility)::repository_visibility
+      and (
+        visibility = 'public'
+        or sqlc.arg(include_private)::boolean
+      )
+    )
+  )
+order by updated_at desc, name asc
+limit sqlc.arg(result_limit);
+
+-- name: ListRepositoriesByOwnerFeatured :many
+select *
+from repositories
+where owner_id = sqlc.arg(owner_id)
+  and (
+    (
+      not sqlc.arg(filter_visibility)::boolean
+      and (
+        visibility = 'public'
+        or sqlc.arg(include_private)::boolean
+      )
+    )
+    or (
+      sqlc.arg(filter_visibility)::boolean
+      and visibility = sqlc.arg(visibility)::repository_visibility
+      and (
+        visibility = 'public'
+        or sqlc.arg(include_private)::boolean
+      )
+    )
+  )
+order by updated_at desc, name asc
+limit sqlc.arg(result_limit);
+
 -- name: UpdateRepository :one
 update repositories
 set

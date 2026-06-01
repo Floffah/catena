@@ -12,6 +12,13 @@ import (
 )
 
 func (s *Server) ListRepositoryIssues(ctx context.Context, request ListRepositoryIssuesRequestObject) (ListRepositoryIssuesResponseObject, error) {
+	limit, ok := normalizedListLimit(request.Params.Limit)
+	if !ok {
+		return ListRepositoryIssues400JSONResponse{
+			BadRequestJSONResponse: BadRequestJSONResponse{Error: "limit must be between 1 and 50"},
+		}, nil
+	}
+
 	repository, accessErr := s.getAccessibleRepository(ctx, request.Owner, request.Repository)
 	if accessErr != nil {
 		switch accessErr.Status {
@@ -30,7 +37,10 @@ func (s *Server) ListRepositoryIssues(ctx context.Context, request ListRepositor
 		}
 	}
 
-	rows, err := s.repository.ListIssuesByRepository(ctx, repository.ID)
+	rows, err := s.repository.ListIssuesByRepository(ctx, db.ListIssuesByRepositoryParams{
+		RepositoryID: repository.ID,
+		ResultLimit:  limit,
+	})
 	if err != nil {
 		return ListRepositoryIssues500JSONResponse{
 			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to list issues"},

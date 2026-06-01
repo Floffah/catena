@@ -50,10 +50,14 @@ export default function ExpandableContent({
             <div
                 ref={contentRef}
                 className={cn(
-                    "overflow-hidden transition-[max-height] duration-300 ease-out",
+                    "overflow-hidden transition-[max-height] duration-300 ease-out interpolate-allow",
                     expanded && "max-h-none",
                 )}
-                style={expanded ? undefined : { maxHeight: collapsedHeight }}
+                style={
+                    expanded
+                        ? { maxHeight: "max-content" }
+                        : { maxHeight: collapsedHeight }
+                }
             >
                 {children}
             </div>

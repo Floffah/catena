@@ -58,6 +58,7 @@ func TestGetAuthenticatedUser(t *testing.T) {
 		assert.That(t, body.Name == "floffah")
 		assert.That(t, body.Email != nil && string(*body.Email) == "floffah@example.com")
 		assert.That(t, body.DisplayName != nil && *body.DisplayName == "Floffah")
+		assert.That(t, body.Description != nil && *body.Description == "Catena builder")
 		assert.That(t, body.AvatarUrl != nil && *body.AvatarUrl == "https://example.com/avatar.png")
 		assert.That(t, body.CreatedAt.Equal(createdAt))
 		assert.That(t, body.UpdatedAt.Equal(updatedAt))
@@ -137,7 +138,7 @@ func TestUpdateAuthenticatedUser(t *testing.T) {
 		newDisplayName := "New Floffah"
 		updatedUser := testUser(userID, "floffah", newDisplayName, "https://example.com/avatar.png", createdAt, updatedAt)
 		mock.ExpectQuery("update users").
-			WithArgs(user.ID, user.Name, pgxmock.AnyArg(), user.AvatarUrl).
+			WithArgs(user.ID, user.Name, pgxmock.AnyArg(), user.AvatarUrl, user.Description).
 			WillReturnRows(userRows().AddRow(
 				updatedUser.ID,
 				updatedUser.ClerkUserID,
@@ -147,6 +148,7 @@ func TestUpdateAuthenticatedUser(t *testing.T) {
 				updatedUser.Email,
 				updatedUser.CreatedAt,
 				updatedUser.UpdatedAt,
+				updatedUser.Description,
 			))
 
 		router := NewRouter(ServerDeps{
@@ -167,6 +169,49 @@ func TestUpdateAuthenticatedUser(t *testing.T) {
 		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
 		assert.That(t, body.Id == userID)
 		assert.That(t, body.DisplayName != nil && *body.DisplayName == newDisplayName)
+		assert.That(t, body.Description != nil && *body.Description == "Catena builder")
+	})
+
+	t.Run("description is trimmed and updated", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		newDescription := "Building better git tools"
+		updatedUser := testUser(userID, "floffah", "Floffah", "https://example.com/avatar.png", createdAt, updatedAt)
+		updatedUser.Description = &newDescription
+		mock.ExpectQuery("update users").
+			WithArgs(user.ID, user.Name, user.DisplayName, user.AvatarUrl, pgxmock.AnyArg()).
+			WillReturnRows(userRows().AddRow(
+				updatedUser.ID,
+				updatedUser.ClerkUserID,
+				updatedUser.Name,
+				updatedUser.DisplayName,
+				updatedUser.AvatarUrl,
+				updatedUser.Email,
+				updatedUser.CreatedAt,
+				updatedUser.UpdatedAt,
+				updatedUser.Description,
+			))
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: user},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPatch, "/v1/user", bytes.NewBufferString(`{"description":"  Building better git tools  "}`))
+		request.Header.Set("Authorization", "Bearer "+testBearerToken)
+		request.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body User
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, body.Id == userID)
+		assert.That(t, body.Description != nil && *body.Description == newDescription)
 	})
 }
 
@@ -251,6 +296,7 @@ func TestGetUserByName(t *testing.T) {
 				user.Email,
 				user.CreatedAt,
 				user.UpdatedAt,
+				user.Description,
 			))
 
 		router := NewRouter(ServerDeps{
@@ -270,6 +316,7 @@ func TestGetUserByName(t *testing.T) {
 		assert.That(t, body.Id == userID)
 		assert.That(t, body.Name == "floffah")
 		assert.That(t, body.DisplayName != nil && *body.DisplayName == "Floffah")
+		assert.That(t, body.Description != nil && *body.Description == "Catena builder")
 	})
 
 	t.Run("missing user returns not found", func(t *testing.T) {
@@ -301,6 +348,7 @@ func TestGetUserByName(t *testing.T) {
 
 func testUser(id uuid.UUID, name string, displayName string, avatarURL string, createdAt time.Time, updatedAt time.Time) db.User {
 	email := name + "@example.com"
+	description := "Catena builder"
 
 	return db.User{
 		ID:          UUIDToPgtype(id),
@@ -311,6 +359,7 @@ func testUser(id uuid.UUID, name string, displayName string, avatarURL string, c
 		Email:       email,
 		CreatedAt:   pgtype.Timestamptz{Time: createdAt, Valid: true},
 		UpdatedAt:   pgtype.Timestamptz{Time: updatedAt, Valid: true},
+		Description: &description,
 	}
 }
 
@@ -324,5 +373,6 @@ func userRows() *pgxmock.Rows {
 		"email",
 		"created_at",
 		"updated_at",
+		"description",
 	})
 }

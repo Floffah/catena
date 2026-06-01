@@ -13,6 +13,7 @@ import { $api } from "@/lib/api";
 
 const formSchema = z.object({
     displayName: z.string().min(1, "Display name is required"),
+    description: z.string(),
 });
 
 export default function ProfileSettings() {
@@ -23,6 +24,7 @@ export default function ProfileSettings() {
     const form = useAppForm({
         defaultValues: {
             displayName: user?.displayName || "",
+            description: user?.description || "",
         },
         validators: {
             onSubmit: formSchema,
@@ -53,6 +55,10 @@ export default function ProfileSettings() {
 
                 <form.AppField name="displayName">
                     {(field) => <field.InputField label="Display Name" />}
+                </form.AppField>
+
+                <form.AppField name="description">
+                    {(field) => <field.TextareaField label="Bio" />}
                 </form.AppField>
 
                 <Field>

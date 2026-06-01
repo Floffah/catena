@@ -36,6 +36,16 @@ These features are mostly prospective and may be subject to change as the projec
 
 read `justfile` or run `just` to see available commands. do not run dev commands.
 
+## Workflow
+
+- Treat each chat as a fresh handoff. Before starting work, read this file, the relevant README sections, and inspect the area being changed instead of relying on prior chat context.
+- For large features, plan first and implement thin vertical slices. Prefer small, working increments over broad partially-complete rewrites.
+- Ask before changing auth, authorization, repository storage, migration strategy, Git serving behavior, deployment topology, or other architecture-level decisions.
+- If OpenAPI specs, sqlc queries, or migrations change, run the appropriate generation step, usually `just generate`, unless the user explicitly says not to.
+- After backend changes, usually run `go test ./...`. After frontend changes, usually run `bun run test` and `bun run lint`. Do not run dev servers.
+- End each task with a concise handoff: what changed, what was verified, and any assumptions, risks, or follow-up work.
+- Keep README roadmap, requirements, deployment notes, and architecture diagrams up to date when those concepts change.
+
 ## Guidance
 
 - Keep generated files generated; edit OpenAPI specs, SQL queries, or migrations instead.
@@ -44,6 +54,20 @@ read `justfile` or run `just` to see available commands. do not run dev commands
 - Do not implement Git internals until the platform can create, clone, push, and view repos using the Git binary.
 - Keep `internal/pkg/git` as a thin Git-binary wrapper; put Catena Git business logic in `internal/pkg/gitstore`.
 - If an architectural decision is unclear or risky, stop and ask before building around it.
+- When using CodeGraph, it does not index OpenAPI schemas or SQL(c) files. Any time you encounter a model, endpoint, query, etc, its source of truth is likely in an sqlc or openapi-managed file.
+
+## Project Guidelines
+
+- Do not expose Clerk IDs or other auth-provider internals in public API responses.
+- Server-side frontend API clients must be created per request, currently via `serverGetApiClient`, so auth headers cannot bleed between users in the standalone Next.js server.
+- Keep Git smart HTTP outside OpenAPI. Git clone, fetch, and push traffic should remain separate from the product API and continue to flow through `git-http-backend`.
+- Treat user-provided repository refs and paths as security-sensitive. Be careful with traversal, revision syntax, and any value that eventually reaches Git or filesystem operations.
+- Frontend work should not reintroduce Next.js Cache Components / `"use cache"` patterns unless explicitly requested. Catena currently prioritizes SSR/SEO and request-aware auth over forcing Cache Components.
+- Current production assumptions are Railway, standalone Next.js, Go API/Git backend, Caddy reverse proxy, Postgres, and a persistent Git volume. Runtime containers that serve Git must include a real Git installation with `git-http-backend`.
+- Prefer action/scope-style authorization over broad RBAC. The long-term authorization shape should check actions against a resource context rather than hardcoding role names.
+- Issues and pull requests should share `repository_items` for numbering, references, labels, and timeline concepts. Subtype tables should store only subtype-specific fields.
+- Backend tests should exercise real handlers and services where practical, using `httptest`, `pgxmock`, `t.TempDir()`, and shared test utilities instead of reimplementing parallel routers.
+- Frontend tests use Bun, Testing Library, happy-dom, and MSW. Prefer testing user-visible behavior and API interactions over implementation details.
 
 ## Skills
 

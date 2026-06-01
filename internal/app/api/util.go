@@ -10,6 +10,20 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+const maxListLimit = 50
+
+func normalizedListLimit(limit *int) (int32, bool) {
+	if limit == nil {
+		return maxListLimit, true
+	}
+
+	if *limit < 1 || *limit > maxListLimit {
+		return 0, false
+	}
+
+	return int32(*limit), true
+}
+
 func RepositoryToAPI(repository db.Repository, ownerName string) (Repository, error) {
 	id, err := uuid.FromBytes(repository.ID.Bytes[:])
 	if err != nil {
@@ -43,6 +57,7 @@ func UserToAPI(user db.User) (User, error) {
 	return User{
 		AvatarUrl:   user.AvatarUrl,
 		CreatedAt:   user.CreatedAt.Time,
+		Description: user.Description,
 		DisplayName: user.DisplayName,
 		Email:       new(openapi_types.Email(user.Email)),
 		Id:          id,

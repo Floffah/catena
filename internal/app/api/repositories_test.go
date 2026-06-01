@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -180,6 +181,352 @@ func TestGetRepositoryByOwnerAndName(t *testing.T) {
 	})
 }
 
+func TestListUserRepositoriesByName(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	createdAt := time.Date(2026, 5, 22, 11, 30, 0, 0, time.UTC)
+	updatedAt := createdAt.Add(time.Hour)
+	userID := uuid.MustParse("019deb10-dafc-743f-8cfc-289a80c13ba1")
+	otherUserID := uuid.MustParse("019deb10-dafc-743f-8cfc-289a80c13ba4")
+	publicRepositoryID := uuid.MustParse("019deb10-dafc-743f-8cfc-289a80c13ba2")
+	privateRepositoryID := uuid.MustParse("019deb10-dafc-743f-8cfc-289a80c13ba3")
+	user := testUser(userID, "floffah", "Floffah", "https://example.com/avatar.png", createdAt, updatedAt)
+	otherUser := testUser(otherUserID, "octo", "Octo", "https://example.com/octo.png", createdAt, updatedAt)
+	publicRepository := testRepository(publicRepositoryID, userID, "catena", nil, db.RepositoryVisibilityPublic, "main", createdAt, updatedAt)
+	privateRepository := testRepository(privateRepositoryID, userID, "secret", nil, db.RepositoryVisibilityPrivate, "main", createdAt, updatedAt.Add(-time.Hour))
+
+	t.Run("anonymous request defaults to updated sort and max limit", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, false, false, db.RepositoryVisibilityPublic, int32(maxListLimit)).
+			WillReturnRows(repositoryRows().AddRow(
+				publicRepository.ID,
+				publicRepository.OwnerID,
+				publicRepository.Name,
+				publicRepository.Description,
+				publicRepository.Visibility,
+				publicRepository.DefaultBranch,
+				publicRepository.CreatedAt,
+				publicRepository.UpdatedAt,
+				publicRepository.ItemPrefix,
+				publicRepository.NextItemNumber,
+			))
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: user},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 1)
+		assert.That(t, body.Repositories[0].Id == publicRepositoryID)
+		assert.That(t, body.Repositories[0].OwnerName == user.Name)
+		assert.That(t, body.Repositories[0].Visibility == Public)
+	})
+
+	t.Run("owner request can include private repositories with featured sort", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, false, true, db.RepositoryVisibilityPublic, int32(6)).
+			WillReturnRows(repositoryRows().
+				AddRow(
+					publicRepository.ID,
+					publicRepository.OwnerID,
+					publicRepository.Name,
+					publicRepository.Description,
+					publicRepository.Visibility,
+					publicRepository.DefaultBranch,
+					publicRepository.CreatedAt,
+					publicRepository.UpdatedAt,
+					publicRepository.ItemPrefix,
+					publicRepository.NextItemNumber,
+				).
+				AddRow(
+					privateRepository.ID,
+					privateRepository.OwnerID,
+					privateRepository.Name,
+					privateRepository.Description,
+					privateRepository.Visibility,
+					privateRepository.DefaultBranch,
+					privateRepository.CreatedAt,
+					privateRepository.UpdatedAt,
+					privateRepository.ItemPrefix,
+					privateRepository.NextItemNumber,
+				))
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: user},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories?sort=featured&limit=6", nil)
+		request.Header.Set("Authorization", "Bearer "+testBearerToken)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 2)
+		assert.That(t, body.Repositories[0].Id == publicRepositoryID)
+		assert.That(t, body.Repositories[1].Id == privateRepositoryID)
+		assert.That(t, body.Repositories[1].Visibility == Private)
+	})
+
+	t.Run("authenticated non-owner request cannot include private repositories", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, false, false, db.RepositoryVisibilityPublic, int32(maxListLimit)).
+			WillReturnRows(repositoryRows().AddRow(
+				publicRepository.ID,
+				publicRepository.OwnerID,
+				publicRepository.Name,
+				publicRepository.Description,
+				publicRepository.Visibility,
+				publicRepository.DefaultBranch,
+				publicRepository.CreatedAt,
+				publicRepository.UpdatedAt,
+				publicRepository.ItemPrefix,
+				publicRepository.NextItemNumber,
+			))
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: otherUser},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories", nil)
+		request.Header.Set("Authorization", "Bearer "+testBearerToken)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 1)
+		assert.That(t, body.Repositories[0].Id == publicRepositoryID)
+		assert.That(t, body.Repositories[0].Visibility == Public)
+	})
+
+	t.Run("auth context failure falls back to public repositories", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, false, false, db.RepositoryVisibilityPublic, int32(maxListLimit)).
+			WillReturnRows(repositoryRows().AddRow(
+				publicRepository.ID,
+				publicRepository.OwnerID,
+				publicRepository.Name,
+				publicRepository.Description,
+				publicRepository.Visibility,
+				publicRepository.DefaultBranch,
+				publicRepository.CreatedAt,
+				publicRepository.UpdatedAt,
+				publicRepository.ItemPrefix,
+				publicRepository.NextItemNumber,
+			))
+
+		router := NewRouter(ServerDeps{
+			DB: mock,
+			Auth: testAuthProvider{
+				user:    user,
+				authErr: errors.New("stale auth context"),
+			},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 1)
+		assert.That(t, body.Repositories[0].Id == publicRepositoryID)
+		assert.That(t, body.Repositories[0].Visibility == Public)
+	})
+
+	t.Run("user lookup failure falls back to public repositories", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, false, false, db.RepositoryVisibilityPublic, int32(maxListLimit)).
+			WillReturnRows(repositoryRows().AddRow(
+				publicRepository.ID,
+				publicRepository.OwnerID,
+				publicRepository.Name,
+				publicRepository.Description,
+				publicRepository.Visibility,
+				publicRepository.DefaultBranch,
+				publicRepository.CreatedAt,
+				publicRepository.UpdatedAt,
+				publicRepository.ItemPrefix,
+				publicRepository.NextItemNumber,
+			))
+
+		router := NewRouter(ServerDeps{
+			DB: mock,
+			Auth: testAuthProvider{
+				user:    user,
+				userErr: errors.New("partially provisioned user"),
+			},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories", nil)
+		request.Header.Set("Authorization", "Bearer "+testBearerToken)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 1)
+		assert.That(t, body.Repositories[0].Id == publicRepositoryID)
+		assert.That(t, body.Repositories[0].Visibility == Public)
+	})
+
+	t.Run("owner request can explicitly filter public repositories", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, true, true, db.RepositoryVisibilityPublic, int32(6)).
+			WillReturnRows(repositoryRows().AddRow(
+				publicRepository.ID,
+				publicRepository.OwnerID,
+				publicRepository.Name,
+				publicRepository.Description,
+				publicRepository.Visibility,
+				publicRepository.DefaultBranch,
+				publicRepository.CreatedAt,
+				publicRepository.UpdatedAt,
+				publicRepository.ItemPrefix,
+				publicRepository.NextItemNumber,
+			))
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: user},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories?sort=featured&limit=6&visibility=public", nil)
+		request.Header.Set("Authorization", "Bearer "+testBearerToken)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 1)
+		assert.That(t, body.Repositories[0].Id == publicRepositoryID)
+		assert.That(t, body.Repositories[0].Visibility == Public)
+	})
+
+	t.Run("anonymous request cannot see explicit private repositories", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectUserByName(mock, user)
+		mock.ExpectQuery("select (.+) from repositories").
+			WithArgs(user.ID, true, false, db.RepositoryVisibilityPrivate, int32(maxListLimit)).
+			WillReturnRows(repositoryRows())
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: user},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories?visibility=private", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body ListRepositoriesResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Repositories) == 0)
+	})
+
+	t.Run("invalid limit returns bad request", func(t *testing.T) {
+		router := NewRouter(ServerDeps{
+			DB:   failDB{t: t},
+			Auth: testAuthProvider{user: user},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories?limit=0", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusBadRequest)
+	})
+
+	t.Run("invalid sort returns bad request", func(t *testing.T) {
+		router := NewRouter(ServerDeps{
+			DB:   failDB{t: t},
+			Auth: testAuthProvider{user: user},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories?sort=random", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusBadRequest)
+	})
+
+	t.Run("invalid visibility returns bad request", func(t *testing.T) {
+		router := NewRouter(ServerDeps{
+			DB:   failDB{t: t},
+			Auth: testAuthProvider{user: user},
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/users/name/floffah/repositories?visibility=secret", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusBadRequest)
+	})
+}
+
 func TestUpdateRepository(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -336,6 +683,22 @@ func expectRepositoryByOwnerAndName(mock pgxmock.PgxPoolIface, ownerName string,
 			repository.UpdatedAt,
 			repository.ItemPrefix,
 			repository.NextItemNumber,
+		))
+}
+
+func expectUserByName(mock pgxmock.PgxPoolIface, user db.User) {
+	mock.ExpectQuery("select (.+) from users").
+		WithArgs(user.Name).
+		WillReturnRows(userRows().AddRow(
+			user.ID,
+			user.ClerkUserID,
+			user.Name,
+			user.DisplayName,
+			user.AvatarUrl,
+			user.Email,
+			user.CreatedAt,
+			user.UpdatedAt,
+			user.Description,
 		))
 }
 

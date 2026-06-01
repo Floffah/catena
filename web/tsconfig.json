@@ -19,6 +19,7 @@
             }
         ],
         "baseUrl": ".",
+        "rootDir": ".",
         "paths": {
             "@/*": ["./src/*"],
             "@/types/*": ["./types/*"],

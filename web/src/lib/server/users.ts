@@ -37,3 +37,24 @@ export const serverGetUserForName = cache(async (name: string) => {
 
     return res.data;
 });
+
+export const serverListFeaturedRepositoriesForUser = cache(
+    async (name: string) => {
+        const apiClient = await serverGetApiClient();
+
+        const res = await apiClient.GET("/v1/users/name/{name}/repositories", {
+            params: {
+                path: {
+                    name,
+                },
+                query: {
+                    limit: 6,
+                    sort: "featured",
+                    visibility: "public",
+                },
+            },
+        });
+
+        return res.data;
+    },
+);

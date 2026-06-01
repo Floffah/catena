@@ -1,8 +1,6 @@
 import { IconFile } from "@tabler/icons-react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
-import ExpandableContent from "@/components/ExpandableContent";
+import ReadmeMarkdown from "@/components/ReadmeMarkdown";
 import ShikiCodeBlock, {
     fileNameToLanguage,
 } from "@/components/ShikiCodeBlock";
@@ -51,16 +49,7 @@ export default async function RepositoryFileViewer({
             </header>
             {shouldRenderMarkdown && (
                 <article className="rounded-lg bg-card p-4 ring-1 ring-foreground/10">
-                    <ExpandableContent
-                        collapseLabel="Collapse README"
-                        expandLabel="Show full README"
-                    >
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
-                            <Markdown remarkPlugins={[remarkGfm]}>
-                                {file.content}
-                            </Markdown>
-                        </div>
-                    </ExpandableContent>
+                    <ReadmeMarkdown content={file.content} />
                 </article>
             )}
             {!shouldRenderMarkdown && (

@@ -79,7 +79,7 @@ func (s *Server) UpdateAuthenticatedUser(ctx context.Context, request UpdateAuth
 		}, nil
 	}
 
-	if request.Body.DisplayName == nil {
+	if request.Body.DisplayName == nil && request.Body.Description == nil {
 		response, err := UserToAPI(user)
 		if err != nil {
 			return UpdateAuthenticatedUser500JSONResponse{
@@ -90,18 +90,33 @@ func (s *Server) UpdateAuthenticatedUser(ctx context.Context, request UpdateAuth
 		return UpdateAuthenticatedUser200JSONResponse(response), nil
 	}
 
-	trimmedDisplayName := strings.TrimSpace(*request.Body.DisplayName)
-	if trimmedDisplayName == "" {
-		return UpdateAuthenticatedUser400JSONResponse{
-			BadRequestJSONResponse: BadRequestJSONResponse{Error: "displayName must not be empty"},
-		}, nil
+	displayName := user.DisplayName
+	if request.Body.DisplayName != nil {
+		trimmedDisplayName := strings.TrimSpace(*request.Body.DisplayName)
+		if trimmedDisplayName == "" {
+			return UpdateAuthenticatedUser400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: "displayName must not be empty"},
+			}, nil
+		}
+		displayName = &trimmedDisplayName
+	}
+
+	description := user.Description
+	if request.Body.Description != nil {
+		trimmedDescription := strings.TrimSpace(*request.Body.Description)
+		if trimmedDescription == "" {
+			description = nil
+		} else {
+			description = &trimmedDescription
+		}
 	}
 
 	user, err = s.repository.UpdateUserProfile(ctx, db.UpdateUserProfileParams{
 		ID:          user.ID,
 		Name:        user.Name,
-		DisplayName: &trimmedDisplayName,
+		DisplayName: displayName,
 		AvatarUrl:   user.AvatarUrl,
+		Description: description,
 	})
 	if err != nil {
 		return UpdateAuthenticatedUser500JSONResponse{

@@ -31,7 +31,8 @@ update users
 set
   name = $2,
   display_name = $3,
-  avatar_url = $4
+  avatar_url = $4,
+  description = $5
 where id = $1
 returning *;
 

@@ -150,6 +150,111 @@ func (s *Server) GetRepositoryByOwnerAndName(ctx context.Context, request GetRep
 	return GetRepositoryByOwnerAndName200JSONResponse(response), nil
 }
 
+func (s *Server) ListUserRepositoriesByName(ctx context.Context, request ListUserRepositoriesByNameRequestObject) (ListUserRepositoriesByNameResponseObject, error) {
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
+		return ListUserRepositoriesByName404JSONResponse{
+			NotFoundJSONResponse: NotFoundJSONResponse{Error: "user not found"},
+		}, nil
+	}
+
+	limit, ok := normalizedListLimit(request.Params.Limit)
+	if !ok {
+		return ListUserRepositoriesByName400JSONResponse{
+			BadRequestJSONResponse: BadRequestJSONResponse{Error: "limit must be between 1 and 50"},
+		}, nil
+	}
+
+	sort := Updated
+	if request.Params.Sort != nil {
+		if !request.Params.Sort.Valid() {
+			return ListUserRepositoriesByName400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: "repository sort is invalid"},
+			}, nil
+		}
+
+		sort = *request.Params.Sort
+	}
+
+	visibility := db.RepositoryVisibilityPublic
+	filterVisibility := false
+	if request.Params.Visibility != nil {
+		if !request.Params.Visibility.Valid() {
+			return ListUserRepositoriesByName400JSONResponse{
+				BadRequestJSONResponse: BadRequestJSONResponse{Error: "repository visibility is invalid"},
+			}, nil
+		}
+
+		visibility = db.RepositoryVisibility(*request.Params.Visibility)
+		filterVisibility = true
+	}
+
+	owner, err := s.repository.GetUserByName(ctx, name)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ListUserRepositoriesByName404JSONResponse{
+				NotFoundJSONResponse: NotFoundJSONResponse{Error: "user not found"},
+			}, nil
+		}
+
+		return ListUserRepositoriesByName500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to load user"},
+		}, nil
+	}
+
+	includePrivate := false
+	authUser, err := s.auth.GetAuthFromContext(ctx)
+	if err == nil && authUser != nil {
+		user, err := s.auth.GetUserFromAuth(ctx, authUser)
+		if err == nil {
+			includePrivate = user.ID.Valid && user.ID == owner.ID
+		}
+	}
+
+	var repositories []db.Repository
+	switch sort {
+	case Featured:
+		repositories, err = s.repository.ListRepositoriesByOwnerFeatured(ctx, db.ListRepositoriesByOwnerFeaturedParams{
+			OwnerID:          owner.ID,
+			FilterVisibility: filterVisibility,
+			IncludePrivate:   includePrivate,
+			Visibility:       visibility,
+			ResultLimit:      limit,
+		})
+	case Updated:
+		repositories, err = s.repository.ListRepositoriesByOwnerUpdated(ctx, db.ListRepositoriesByOwnerUpdatedParams{
+			OwnerID:          owner.ID,
+			FilterVisibility: filterVisibility,
+			IncludePrivate:   includePrivate,
+			Visibility:       visibility,
+			ResultLimit:      limit,
+		})
+	default:
+		return ListUserRepositoriesByName400JSONResponse{
+			BadRequestJSONResponse: BadRequestJSONResponse{Error: "repository sort is invalid"},
+		}, nil
+	}
+	if err != nil {
+		return ListUserRepositoriesByName500JSONResponse{
+			InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to list repositories"},
+		}, nil
+	}
+
+	responseRepositories := make([]Repository, 0, len(repositories))
+	for _, repository := range repositories {
+		responseRepository, err := RepositoryToAPI(repository, owner.Name)
+		if err != nil {
+			return ListUserRepositoriesByName500JSONResponse{
+				InternalServerErrorJSONResponse: InternalServerErrorJSONResponse{Error: "failed to encode repository"},
+			}, nil
+		}
+
+		responseRepositories = append(responseRepositories, responseRepository)
+	}
+
+	return ListUserRepositoriesByName200JSONResponse{Repositories: responseRepositories}, nil
+}
+
 func (s *Server) UpdateRepository(ctx context.Context, request UpdateRepositoryRequestObject) (UpdateRepositoryResponseObject, error) {
 	authUser, err := s.auth.GetAuthFromContext(ctx)
 	if err != nil || authUser == nil {

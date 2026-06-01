@@ -1,11 +1,17 @@
 import { IconUserCog, IconUserEdit } from "@tabler/icons-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import UserAvatar from "@/components/UserAvatar";
 import UserProfileDialogButton from "@/components/UserProfileDialogButton";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ProfileReadme, {
+    ProfileReadmeSkeleton,
+} from "@/components/views/ProfileReadme";
+import ProfileRepositories, {
+    ProfileRepositoriesSkeleton,
+} from "@/components/views/ProfileRepositories";
 import { serverGetUserForName } from "@/lib/server/users";
 
 export default async function Page({
@@ -31,19 +37,24 @@ export default async function Page({
                 <div className="flex min-w-0 flex-col gap-6">
                     <header className="flex flex-col gap-2 text-center md:text-left">
                         <h1 className="font-heading text-4xl font-bold tracking-tight md:text-5xl">
-                            {user.name}
+                            {user.displayName ?? user.name}
                         </h1>
-                        <p className="max-w-2xl text-sm/relaxed text-muted-foreground md:text-base/relaxed">
-                            Lorem ipsum dolor sit amet, consectetur adipiscing
-                            elit. Integer vitae justo sed nibh cursus
-                            ullamcorper.
-                        </p>
+                        {user.name && user.displayName && (
+                            <p className="-mt-2 text-sm text-muted-foreground">
+                                @{user.name}
+                            </p>
+                        )}
+                        {user.description && (
+                            <p className="max-w-2xl text-sm/relaxed whitespace-pre-line text-muted-foreground md:text-base/relaxed">
+                                {user.description}
+                            </p>
+                        )}
                     </header>
 
                     <div className="flex w-full items-center gap-2">
                         <Button asChild variant="secondary">
                             <Link
-                                href={`/${user.name}/settings`}
+                                href={`/settings`}
                                 className="flex flex-1 items-center gap-1"
                             >
                                 <IconUserEdit /> Settings
@@ -56,43 +67,15 @@ export default async function Page({
                         </UserProfileDialogButton>
                     </div>
 
-                    <Card asChild>
-                        <article>
-                            <CardHeader>
-                                <CardTitle>README</CardTitle>
-                            </CardHeader>
-                            <CardContent className="prose prose-sm max-w-none dark:prose-invert">
-                                <p>
-                                    Lorem ipsum dolor sit amet, consectetur
-                                    adipiscing elit. Praesent eget nibh non
-                                    neque fermentum luctus. Curabitur ac
-                                    facilisis turpis, sed tincidunt neque.
-                                </p>
-                            </CardContent>
-                        </article>
-                    </Card>
+                    <Suspense fallback={<ProfileReadmeSkeleton />}>
+                        <ProfileReadme ownerName={ownerName} />
+                    </Suspense>
                 </div>
             </section>
 
-            <section className="grid gap-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Projects</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground">
-                        Projects will appear here.
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Contribution history</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground">
-                        Contribution history will appear here.
-                    </CardContent>
-                </Card>
-            </section>
+            <Suspense fallback={<ProfileRepositoriesSkeleton />}>
+                <ProfileRepositories ownerName={ownerName} />
+            </Suspense>
         </main>
     );
 }

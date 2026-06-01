@@ -45,6 +45,7 @@ func TestRepositoryToAPI(t *testing.T) {
 func TestUserToAPI(t *testing.T) {
 	userID := uuid.MustParse("019deb10-dafc-743f-8cfc-289a80c13af3")
 	displayName := "Ramsay"
+	description := "Building Catena"
 	avatarURL := "https://example.com/avatar.png"
 	createdAt := time.Date(2026, 5, 21, 11, 0, 0, 0, time.UTC)
 	updatedAt := createdAt.Add(time.Hour)
@@ -53,6 +54,7 @@ func TestUserToAPI(t *testing.T) {
 		ID:          UUIDToPgtype(userID),
 		Name:        "floffah",
 		DisplayName: &displayName,
+		Description: &description,
 		AvatarUrl:   &avatarURL,
 		Email:       "floffah@example.com",
 		CreatedAt:   pgtype.Timestamptz{Time: createdAt, Valid: true},
@@ -63,6 +65,7 @@ func TestUserToAPI(t *testing.T) {
 	assert.That(t, got.Id == userID)
 	assert.That(t, got.Name == "floffah")
 	assert.That(t, got.DisplayName != nil && *got.DisplayName == displayName)
+	assert.That(t, got.Description != nil && *got.Description == description)
 	assert.That(t, got.AvatarUrl != nil && *got.AvatarUrl == avatarURL)
 	assert.That(t, got.Email != nil && *got.Email == types.Email("floffah@example.com"))
 	assert.That(t, got.CreatedAt.Equal(createdAt))
