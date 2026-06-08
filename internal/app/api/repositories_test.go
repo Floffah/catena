@@ -6,7 +6,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -178,6 +180,109 @@ func TestGetRepositoryByOwnerAndName(t *testing.T) {
 		var body Repository
 		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
 		assert.That(t, body.Visibility == Private)
+	})
+}
+
+func TestGetRepositoryTree(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	gitBin := requireGit(t)
+	createdAt := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
+	userID := uuid.MustParse("019deb10-dafc-743f-8cfc-289a80c13b05")
+	repositoryID := uuid.MustParse("019deb10-dafc-743f-8cfc-289a80c13b06")
+	user := testUser(userID, "floffah", "Floffah", "https://example.com/avatar.png", createdAt, createdAt)
+	repository := testRepository(repositoryID, userID, "catena", nil, db.RepositoryVisibilityPublic, "main", createdAt, createdAt)
+	gitRoot := t.TempDir()
+	store := gitstore.NewStoreWithTreeLimits(gitRoot, gitBin, gitstore.TreeLimits{
+		MaxEntries: 10,
+		MaxBytes:   1024 * 1024,
+		Timeout:    time.Second,
+	})
+	assert.Nil(t, store.CreateRepo(repository))
+	populateRepositoryTree(t, store.GetRepoPath(repository))
+
+	t.Run("recursive listing includes nested entries", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectRepositoryByOwnerAndName(mock, user.Name, repository.Name, repository)
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: user},
+			Git:  store,
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/repositories/floffah/catena/tree?recursive=true", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body RepositoryTree
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, len(body.Entries) == 3)
+		assertRepositoryTreeContains(t, body, "src", RepositoryTreeEntryTypeTree)
+		assertRepositoryTreeContains(t, body, "README.md", RepositoryTreeEntryTypeBlob)
+		assertRepositoryTreeContains(t, body, "src/main.go", RepositoryTreeEntryTypeBlob)
+	})
+
+	t.Run("recursive listing returns payload too large when limits are exceeded", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectRepositoryByOwnerAndName(mock, user.Name, repository.Name, repository)
+		limitedStore := gitstore.NewStoreWithTreeLimits(gitRoot, gitBin, gitstore.TreeLimits{
+			MaxEntries: 1,
+			MaxBytes:   1024 * 1024,
+			Timeout:    time.Second,
+		})
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: user},
+			Git:  limitedStore,
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/repositories/floffah/catena/tree?recursive=true", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusRequestEntityTooLarge)
+		assert.Nil(t, mock.ExpectationsWereMet())
+
+		var body PayloadTooLargeJSONResponse
+		assert.Nil(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.That(t, body.Error == gitstore.ErrTreeTooLarge.Error())
+	})
+
+	t.Run("ordinary listing is not subject to recursive limits", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		assert.Nil(t, err)
+		defer mock.Close()
+
+		expectRepositoryByOwnerAndName(mock, user.Name, repository.Name, repository)
+		limitedStore := gitstore.NewStoreWithTreeLimits(gitRoot, gitBin, gitstore.TreeLimits{
+			MaxEntries: 1,
+			MaxBytes:   1,
+			Timeout:    time.Nanosecond,
+		})
+
+		router := NewRouter(ServerDeps{
+			DB:   mock,
+			Auth: testAuthProvider{user: user},
+			Git:  limitedStore,
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/v1/repositories/floffah/catena/tree", nil)
+
+		router.ServeHTTP(response, request)
+
+		assert.That(t, response.Code == http.StatusOK)
+		assert.Nil(t, mock.ExpectationsWereMet())
 	})
 }
 
@@ -726,6 +831,47 @@ func requireGit(t *testing.T) string {
 	}
 
 	return gitBin
+}
+
+func populateRepositoryTree(t *testing.T, remotePath string) {
+	t.Helper()
+
+	worktree := t.TempDir()
+	runRepositoryTestGit(t, worktree, "init", "--initial-branch=main")
+	runRepositoryTestGit(t, worktree, "config", "user.name", "Catena Tests")
+	runRepositoryTestGit(t, worktree, "config", "user.email", "tests@catena.local")
+	runRepositoryTestGit(t, worktree, "remote", "add", "origin", remotePath)
+
+	assert.Nil(t, os.WriteFile(filepath.Join(worktree, "README.md"), []byte("# Catena\n"), 0600))
+	assert.Nil(t, os.MkdirAll(filepath.Join(worktree, "src"), 0750))
+	assert.Nil(t, os.WriteFile(filepath.Join(worktree, "src", "main.go"), []byte("package main\n"), 0600))
+	runRepositoryTestGit(t, worktree, "add", ".")
+	runRepositoryTestGit(t, worktree, "commit", "-m", "Initial content")
+	runRepositoryTestGit(t, worktree, "push", "origin", "main")
+}
+
+func assertRepositoryTreeContains(t *testing.T, tree RepositoryTree, path string, entryType RepositoryTreeEntryType) {
+	t.Helper()
+
+	for _, entry := range tree.Entries {
+		if entry.Path == path {
+			assert.That(t, entry.Type == entryType)
+			return
+		}
+	}
+
+	t.Fatalf("repository tree does not contain %q", path)
+}
+
+func runRepositoryTestGit(t *testing.T, directory string, args ...string) {
+	t.Helper()
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = directory
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, string(output))
+	}
 }
 
 func ptr(value string) *string {

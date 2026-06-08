@@ -18,6 +18,12 @@ import (
 const maxReadmeBytes = 1024 * 1024
 const maxFileBytes = 1024 * 1024
 
+const (
+	defaultTreeMaxEntries = 50000
+	defaultTreeMaxBytes   = 20 * 1024 * 1024
+	defaultTreeTimeout             = 10 * time.Second
+)
+
 var (
 	ErrInvalidPath    = errors.New("invalid path")
 	ErrInvalidRef     = errors.New("invalid ref")
@@ -29,6 +35,7 @@ var (
 	ErrRefNotFound    = errors.New("ref not found")
 	ErrPathNotFound   = errors.New("path not found")
 	ErrTreeNotFound   = errors.New("tree not found")
+	ErrTreeTooLarge   = errors.New("recursive tree exceeds server limits")
 )
 
 type Readme struct {
@@ -94,22 +101,42 @@ type Ref struct {
 	IsDefault bool
 }
 
+type TreeLimits struct {
+	MaxEntries int
+	MaxBytes   int64
+	Timeout    time.Duration
+}
+
 // Store is not a git backend, but the git orchestrator. Business logic for git operations, using the git package as the backend
 type Store struct {
 	git git.Git
 
-	root string
+	root       string
+	treeLimits TreeLimits
 }
 
 func NewStore(root string, gitBin string) Store {
+	return NewStoreWithTreeLimits(root, gitBin, TreeLimits{
+		MaxBytes:   defaultTreeMaxBytes,
+		MaxEntries: defaultTreeMaxEntries,
+		Timeout:    defaultTreeTimeout,
+	})
+}
+
+func NewStoreWithTreeLimits(root string, gitBin string, limits TreeLimits) Store {
 	return Store{
-		git:  git.NewGit(gitBin),
-		root: root,
+		git:        git.NewGit(gitBin),
+		root:       root,
+		treeLimits: limits,
 	}
 }
 
 func NewStoreFromEnv(env environment.Environment) Store {
-	return NewStore(env.Config.CatenaGitRoot, env.GitBin)
+	return NewStoreWithTreeLimits(env.Config.CatenaGitRoot, env.GitBin, TreeLimits{
+		MaxEntries: env.Config.GitTreeMaxEntries,
+		MaxBytes:   env.Config.GitTreeMaxBytes,
+		Timeout:    env.Config.GitTreeTimeout,
+	})
 }
 
 func (s Store) CreateRepo(dbRepo db.Repository) error {
@@ -249,7 +276,7 @@ func (s Store) GetFile(ctx context.Context, dbRepo db.Repository, ref string, fi
 	}, nil
 }
 
-func (s Store) GetTree(ctx context.Context, dbRepo db.Repository, ref string, directory string) (Tree, error) {
+func (s Store) GetTree(ctx context.Context, dbRepo db.Repository, ref string, directory string, recursive bool) (Tree, error) {
 	if ref == "" {
 		ref = dbRepo.DefaultBranch
 	}
@@ -273,7 +300,24 @@ func (s Store) GetTree(ctx context.Context, dbRepo db.Repository, ref string, di
 		treeish = commitOID + ":" + directory
 	}
 
-	gitEntries, err := s.git.LsTree(ctx, repoPath, treeish)
+	var gitEntries []git.TreeEntry
+	if recursive {
+		recursiveCtx, cancel := context.WithTimeout(ctx, s.treeLimits.Timeout)
+		defer cancel()
+
+		gitEntries, err = s.git.LsTreeRecursive(
+			recursiveCtx,
+			repoPath,
+			treeish,
+			s.treeLimits.MaxEntries,
+			s.treeLimits.MaxBytes,
+		)
+		if errors.Is(err, git.ErrLsTreeLimitExceeded) || errors.Is(recursiveCtx.Err(), context.DeadlineExceeded) {
+			return Tree{}, ErrTreeTooLarge
+		}
+	} else {
+		gitEntries, err = s.git.LsTree(ctx, repoPath, treeish)
+	}
 	if err != nil {
 		return Tree{}, ErrTreeNotFound
 	}

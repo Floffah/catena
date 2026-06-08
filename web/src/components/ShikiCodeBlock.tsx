@@ -126,6 +126,14 @@ export function fileNameToLanguage(fileName: string): BundledLanguage | string {
     }
 }
 
+const highlighter = await createHighlighter({
+    themes: [
+        theme as unknown as ThemeInput,
+        lightTheme as unknown as ThemeInput,
+    ],
+    langs: Object.values(SupportedLanguages),
+});
+
 export default async function ShikiCodeBlock({
     children,
     lang,
@@ -135,13 +143,6 @@ export default async function ShikiCodeBlock({
     children: string;
     lang: BundledLanguage | string;
 }) {
-    const highlighter = await createHighlighter({
-        themes: [
-            theme as unknown as ThemeInput,
-            lightTheme as unknown as ThemeInput,
-        ],
-        langs: Object.values(SupportedLanguages),
-    });
     const out = highlighter.codeToHast(children, {
         lang: lang,
         themes: {

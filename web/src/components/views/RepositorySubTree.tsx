@@ -16,14 +16,12 @@ export default async function RepositorySubTree({
 }) {
     return (
         <main className="flex flex-col gap-4">
-            <Suspense fallback={null}>
-                <RepositoryFileList
-                    ownerName={ownerName}
-                    repoName={repoName}
-                    currentRef={branch}
-                    path={path}
-                />
-            </Suspense>
+            <RepositoryFileList
+                ownerName={ownerName}
+                repoName={repoName}
+                currentRef={branch}
+                path={path}
+            />
 
             <Suspense fallback={null}>
                 <RepositoryReadme

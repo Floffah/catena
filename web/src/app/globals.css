@@ -191,3 +191,52 @@
 @utility interpolate-none {
     interpolate-size: initial;
 }
+
+@layer components {
+    file-tree-container {
+        display: flex;
+        color-scheme: light;
+        background-color: var(--card);
+        color: var(--card-foreground);
+        border-color: var(--trees-theme-sidebar-border, light-dark(oklch(0% 0 0 / 0.15), oklch(100% 0 0 / 0.15)));
+
+        --trees-item-height: 30px;
+        --trees-density-override: 1;
+        --trees-padding-inline: 0;
+
+        --trees-theme-sidebar-bg: var(--card);
+        --trees-theme-sidebar-fg: #4c4f69;
+        --trees-theme-sidebar-header-fg: #4c4f69;
+        --trees-theme-list-active-selection-fg: #4c4f69;
+        --trees-theme-list-hover-bg: rgba(0, 0, 0, 0.06);
+        --trees-theme-list-active-selection-bg: #f1f3f3;
+        --trees-theme-focus-ring: #9ca8ab;
+        --trees-theme-input-bg: #f1f3f3;
+        --trees-theme-sidebar-border: #00000000;
+        --trees-theme-input-border: #00000000;
+        --trees-theme-scrollbar-thumb: #9ca8ab40;
+        --trees-theme-git-added-fg: #40a02b;
+        --trees-theme-git-modified-fg: #df8e1d;
+        --trees-theme-git-deleted-fg: #d20f39;
+    }
+
+    .dark file-tree-container {
+        color-scheme: dark;
+        border-color: var(--trees-theme-sidebar-border, light-dark(oklch(0% 0 0 / 0.15), oklch(100% 0 0 / 0.15)));
+
+        --trees-theme-sidebar-bg: var(--card);
+        --trees-theme-sidebar-fg: #cdd6f4;
+        --trees-theme-sidebar-header-fg: #cdd6f4;
+        --trees-theme-list-active-selection-fg: #cdd6f4;
+        --trees-theme-list-hover-bg: #ffffff0f;
+        --trees-theme-list-active-selection-bg: #22292b;
+        --trees-theme-focus-ring: #67787c;
+        --trees-theme-input-bg: #22292b;
+        --trees-theme-sidebar-border: #00000000;
+        --trees-theme-input-border: #00000000;
+        --trees-theme-scrollbar-thumb: #738a9440;
+        --trees-theme-git-added-fg: #a6e3a1;
+        --trees-theme-git-modified-fg: #f9e2af;
+        --trees-theme-git-deleted-fg: #f38ba8;
+    }
+}

@@ -675,6 +675,9 @@ type InternalServerError = Error
 // NotFound defines model for NotFound.
 type NotFound = Error
 
+// PayloadTooLarge defines model for PayloadTooLarge.
+type PayloadTooLarge = Error
+
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
@@ -730,6 +733,9 @@ type GetRepositoryTreeParams struct {
 
 	// Path Directory path to list. Defaults to the repository root.
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// Recursive Recursively list all files and directories below the requested path. Defaults to false and may be rejected when server limits are exceeded.
+	Recursive *bool `form:"recursive,omitempty" json:"recursive,omitempty"`
 }
 
 // ListUserRepositoriesByNameParams defines parameters for ListUserRepositoriesByName.
@@ -1659,6 +1665,14 @@ func (siw *ServerInterfaceWrapper) GetRepositoryTree(c *gin.Context) {
 		return
 	}
 
+	// ------------- Optional query parameter "recursive" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "recursive", c.Request.URL.Query(), &params.Recursive, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter recursive: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -1876,6 +1890,8 @@ type ForbiddenJSONResponse Error
 type InternalServerErrorJSONResponse Error
 
 type NotFoundJSONResponse Error
+
+type PayloadTooLargeJSONResponse Error
 
 type UnauthorizedJSONResponse Error
 
@@ -2726,6 +2742,15 @@ type GetRepositoryTree404JSONResponse struct{ NotFoundJSONResponse }
 func (response GetRepositoryTree404JSONResponse) VisitGetRepositoryTreeResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRepositoryTree413JSONResponse struct{ PayloadTooLargeJSONResponse }
+
+func (response GetRepositoryTree413JSONResponse) VisitGetRepositoryTreeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
 
 	return json.NewEncoder(w).Encode(response)
 }

@@ -13,12 +13,25 @@ Links:
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Contents
 
+- [What makes Catena different](#what-makes-catena-different)
 - [Roadmap](#roadmap)
 - [Goals](#goals)
 - [Deployment](#deployment)
 - [Future architecture](#future-architecture)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## What makes Catena different
+
+Catena is not intended to become a smaller copy of an all-in-one forge. Its direction is a composable, Git-native social development platform: keep the core forge focused, integrate excellent specialist tools, and make repositories portable across hosts and workflows.
+
+The currently working foundation includes self-hostable filesystem-backed Git repositories, standard Git-over-HTTP clone/fetch/push, an OpenAPI product API, a web repository browser, account and token management, and an intentionally small issue tracker. The more distinctive capabilities below are planned unless they are marked complete in the roadmap:
+
+- **Composable instead of all-in-one:** Keep built-in issue tracking focused on triage, then provide first-class integrations with dedicated project-management, diff, code-review, CI, and deployment tools such as Linear, grapharc, diffs.com, trees.software, Depot, Blacksmith, Render, Fly.io, and Vercel. [FR-008, FR-009, FR-011, FR-012, FR-015]
+- **Git-native workflows beyond the web UI:** Let repositories configure themselves with `catenarc`, create repositories by pushing, and accept mail-in patches as pull requests. [FR-020, FR-021, FR-049]
+- **Agent-native collaboration:** Make AI review, agent task offload, agent-powered triage, and quick snippet-sharing first-class capabilities across the collaboration workflow. [FR-023, FR-024, FR-025, FR-026]
+- **Portable and interoperable repositories:** Support import, export, and mirroring across other Git hosts so projects are not trapped on Catena. [FR-041]
+- **A social network that can outgrow one host:** Allow people to run their own Catena backend while participating in a shared global network of repositories, users, and organisations. [FR-042]
 
 ## Roadmap
 
