@@ -170,8 +170,13 @@ func TestStoreRecursiveTreeLimits(t *testing.T) {
 	ctx := context.Background()
 	store, repository := newPopulatedTestStore(t, gitBin)
 
-	store.treeLimits.MaxEntries = 2
-	_, err := store.GetTree(ctx, repository, "", "/", true)
+	store.treeLimits.MaxEntries = 6
+	tree, err := store.GetTree(ctx, repository, "", "/", true)
+	assert.Nil(t, err)
+	assert.That(t, len(tree.Entries) == store.treeLimits.MaxEntries)
+
+	store.treeLimits.MaxEntries = 5
+	_, err = store.GetTree(ctx, repository, "", "/", true)
 	assert.That(t, errors.Is(err, ErrTreeTooLarge))
 
 	store.treeLimits.MaxEntries = defaultTreeMaxEntries

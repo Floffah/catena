@@ -216,12 +216,12 @@ func (g Git) LsTreeRecursive(ctx context.Context, repoPath string, treeish strin
 				_ = cmd.Wait()
 				return nil, parseErr
 			}
-			entries = append(entries, entry)
-			if len(entries) > maxEntries {
+			if len(entries) >= maxEntries {
 				cancel()
 				_ = cmd.Wait()
 				return nil, ErrLsTreeLimitExceeded
 			}
+			entries = append(entries, entry)
 		}
 
 		if errors.Is(readErr, io.EOF) {

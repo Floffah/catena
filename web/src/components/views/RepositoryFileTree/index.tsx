@@ -25,7 +25,6 @@ export default async function RepositoryFileTree({
     path: string;
     isTree: boolean;
 }) {
-    console.log(path);
     const tree = await serverGetRepositoryTree(
         ownerName,
         repoName,
@@ -50,9 +49,8 @@ export default async function RepositoryFileTree({
         .slice(0, -1)
         .map((_, index, arr) => arr.slice(0, index + 1).join("/"));
 
-    const lastSeg = path.split("/").pop();
-    if (isTree && lastSeg) {
-        initialExpandedPaths.push(lastSeg);
+    if (isTree && !initialExpandedPaths.includes(path)) {
+        initialExpandedPaths.push(path);
     }
 
     const payload = preloadFileTree({
