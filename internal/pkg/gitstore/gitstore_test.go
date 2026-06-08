@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/floffah/catena/internal/pkg/db"
 	"github.com/google/uuid"
@@ -140,7 +141,7 @@ func TestStoreReadRepositoryContent(t *testing.T) {
 	assert.That(t, file.Path == "src/main.go")
 	assert.That(t, file.Content == "package main\n")
 
-	tree, err := store.GetTree(ctx, repository, "", "/")
+	tree, err := store.GetTree(ctx, repository, "", "/", false)
 	assert.Nil(t, err)
 	assert.That(t, tree.Ref == "main")
 	assert.That(t, tree.Path == "")
@@ -151,6 +152,42 @@ func TestStoreReadRepositoryContent(t *testing.T) {
 	assert.That(t, tree.Entries[1].Type == "tree")
 	assert.That(t, tree.Entries[2].Name == "README.md")
 	assert.That(t, tree.Entries[2].Type == "blob")
+
+	recursiveTree, err := store.GetTree(ctx, repository, "", "/", true)
+	assert.Nil(t, err)
+	assert.That(t, recursiveTree.Ref == "main")
+	assert.That(t, len(recursiveTree.Entries) == 6)
+	assertTreeContains(t, recursiveTree, "docs", "tree")
+	assertTreeContains(t, recursiveTree, "docs/README", "blob")
+	assertTreeContains(t, recursiveTree, "docs/guide.md", "blob")
+	assertTreeContains(t, recursiveTree, "src", "tree")
+	assertTreeContains(t, recursiveTree, "src/main.go", "blob")
+	assertTreeContains(t, recursiveTree, "README.md", "blob")
+}
+
+func TestStoreRecursiveTreeLimits(t *testing.T) {
+	gitBin := requireGit(t)
+	ctx := context.Background()
+	store, repository := newPopulatedTestStore(t, gitBin)
+
+	store.treeLimits.MaxEntries = 6
+	tree, err := store.GetTree(ctx, repository, "", "/", true)
+	assert.Nil(t, err)
+	assert.That(t, len(tree.Entries) == store.treeLimits.MaxEntries)
+
+	store.treeLimits.MaxEntries = 5
+	_, err = store.GetTree(ctx, repository, "", "/", true)
+	assert.That(t, errors.Is(err, ErrTreeTooLarge))
+
+	store.treeLimits.MaxEntries = defaultTreeMaxEntries
+	store.treeLimits.MaxBytes = 1
+	_, err = store.GetTree(ctx, repository, "", "/", true)
+	assert.That(t, errors.Is(err, ErrTreeTooLarge))
+
+	store.treeLimits.MaxBytes = defaultTreeMaxBytes
+	store.treeLimits.Timeout = time.Nanosecond
+	_, err = store.GetTree(ctx, repository, "", "/", true)
+	assert.That(t, errors.Is(err, ErrTreeTooLarge))
 }
 
 func TestStoreResolveGitPath(t *testing.T) {
@@ -232,11 +269,24 @@ func TestStoreErrors(t *testing.T) {
 	_, err = store.GetFile(ctx, repository, "-bad-ref", "README.md")
 	assert.That(t, errors.Is(err, ErrInvalidRef))
 
-	_, err = store.GetTree(ctx, repository, "", "../escape")
+	_, err = store.GetTree(ctx, repository, "", "../escape", false)
 	assert.That(t, errors.Is(err, ErrInvalidPath))
 
 	_, err = store.GetReadme(ctx, repository, "", "src")
 	assert.That(t, errors.Is(err, ErrReadmeNotFound))
+}
+
+func assertTreeContains(t *testing.T, tree Tree, path string, entryType string) {
+	t.Helper()
+
+	for _, entry := range tree.Entries {
+		if entry.Path == path {
+			assert.That(t, entry.Type == entryType)
+			return
+		}
+	}
+
+	t.Fatalf("tree does not contain %q", path)
 }
 
 func requireGit(t *testing.T) string {

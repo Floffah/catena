@@ -72,7 +72,13 @@ export const serverGetRepositoryFile = cache(
 );
 
 export const serverGetRepositoryTree = cache(
-    async (ownerName: string, repoName: string, ref = "main", path = "/") => {
+    async (
+        ownerName: string,
+        repoName: string,
+        ref = "main",
+        path = "/",
+        recursive = false,
+    ) => {
         const apiClient = await serverGetApiClient();
 
         const res = await apiClient.GET(
@@ -86,6 +92,7 @@ export const serverGetRepositoryTree = cache(
                     query: {
                         ref,
                         path,
+                        recursive,
                     },
                 },
             },

@@ -687,7 +687,9 @@ func (s *Server) GetRepositoryTree(ctx context.Context, request GetRepositoryTre
 		directory = strings.TrimSpace(*request.Params.Path)
 	}
 
-	tree, err := s.git.GetTree(ctx, repository, ref, directory)
+	recursive := request.Params.Recursive != nil && *request.Params.Recursive
+
+	tree, err := s.git.GetTree(ctx, repository, ref, directory, recursive)
 	if err != nil {
 		switch {
 		case errors.Is(err, gitstore.ErrInvalidPath), errors.Is(err, gitstore.ErrInvalidRef):
@@ -697,6 +699,10 @@ func (s *Server) GetRepositoryTree(ctx context.Context, request GetRepositoryTre
 		case errors.Is(err, gitstore.ErrTreeNotFound):
 			return GetRepositoryTree404JSONResponse{
 				NotFoundJSONResponse: NotFoundJSONResponse{Error: "tree not found"},
+			}, nil
+		case errors.Is(err, gitstore.ErrTreeTooLarge):
+			return GetRepositoryTree413JSONResponse{
+				PayloadTooLargeJSONResponse: PayloadTooLargeJSONResponse{Error: err.Error()},
 			}, nil
 		default:
 			return GetRepositoryTree500JSONResponse{

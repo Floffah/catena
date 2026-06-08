@@ -1,8 +1,11 @@
 package git
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"path"
 	"strconv"
@@ -17,6 +20,8 @@ type TreeEntry struct {
 	Size *int64
 	Path string
 }
+
+var ErrLsTreeLimitExceeded = errors.New("ls-tree limit exceeded")
 
 type CommitSummary struct {
 	OID             string
@@ -172,6 +177,65 @@ func (g Git) LsTree(ctx context.Context, repoPath string, treeish string) ([]Tre
 			return nil, err
 		}
 		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
+func (g Git) LsTreeRecursive(ctx context.Context, repoPath string, treeish string, maxEntries int, maxOutputBytes int64) ([]TreeEntry, error) {
+	commandCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cmd := exec.CommandContext(commandCtx, g.BinaryPath, "-C", repoPath, "ls-tree", "-r", "-t", "-l", "-z", treeish)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	reader := bufio.NewReader(io.LimitReader(stdout, maxOutputBytes+1))
+	entries := make([]TreeEntry, 0)
+	var outputBytes int64
+
+	for {
+		record, readErr := reader.ReadString('\x00')
+		outputBytes += int64(len(record))
+		if outputBytes > maxOutputBytes {
+			cancel()
+			_ = cmd.Wait()
+			return nil, ErrLsTreeLimitExceeded
+		}
+
+		record = strings.TrimSuffix(record, "\x00")
+		if record != "" {
+			entry, parseErr := parseLsTreeRecord(record)
+			if parseErr != nil {
+				cancel()
+				_ = cmd.Wait()
+				return nil, parseErr
+			}
+			if len(entries) >= maxEntries {
+				cancel()
+				_ = cmd.Wait()
+				return nil, ErrLsTreeLimitExceeded
+			}
+			entries = append(entries, entry)
+		}
+
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			cancel()
+			_ = cmd.Wait()
+			return nil, readErr
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return nil, err
 	}
 
 	return entries, nil

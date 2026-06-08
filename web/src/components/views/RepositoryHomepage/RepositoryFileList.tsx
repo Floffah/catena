@@ -19,6 +19,7 @@ export async function RepositoryFileList({
         repoName,
         currentRef,
         path,
+        false,
     );
 
     if (!tree) {

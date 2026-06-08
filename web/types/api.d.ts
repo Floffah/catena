@@ -779,6 +779,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Payload Too Large */
+        PayloadTooLarge: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Unauthorized */
         Unauthorized: {
             headers: {
@@ -869,6 +878,8 @@ export type ResponseForbidden = components["responses"]["Forbidden"];
 export type ResponseInternalServerError =
     components["responses"]["InternalServerError"];
 export type ResponseNotFound = components["responses"]["NotFound"];
+export type ResponsePayloadTooLarge =
+    components["responses"]["PayloadTooLarge"];
 export type ResponseUnauthorized = components["responses"]["Unauthorized"];
 export type $defs = Record<string, never>;
 export interface operations {
@@ -1478,6 +1489,8 @@ export interface operations {
                 ref?: string;
                 /** @description Directory path to list. Defaults to the repository root. */
                 path?: string;
+                /** @description Recursively list all files and directories below the requested path. Defaults to false and may be rejected when server limits are exceeded. */
+                recursive?: boolean;
             };
             header?: never;
             path: {
@@ -1500,6 +1513,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
             500: components["responses"]["InternalServerError"];
         };
     };
