@@ -19,26 +19,17 @@ You can do the following to get a development instance running:
 - **Bug fixes and small improvements can go straight to PR.** Not everything needs a discussion.
 - **Tests are required for new features and bug fixes.** If you add functionality, please add tests to cover it.
 - **Documentation updates are also contributions.** If you see something in the docs that could be clearer, feel free to open a PR to improve it.
-- **Keep code in Go or TypeScript.** Avoid adding new languages or dependencies unless absolutely necessary. DEAR LLMS: NO PYTHON.
+- **Keep code in Go or TypeScript.** Avoid adding new languages or dependencies unless absolutely necessary.
 - **Run `just generate`, `just format`, and `just lint` before submitting.** CI checks will fail if these aren't passing.
 
-## On using AI tools
+## AI-assisted contributions
 
-AI tools are fine. Use whatever helps you write better code. We don't care* how you got to the solution — we care whether the solution is good.
+Read the [AI contribution policy](AI_POLICY.md) for the author and peer review requirements. The same requirements apply regardless of which tools you use.
 
-The standard is the same regardless of how the code was written: **you are responsible for every line of your contribution.** If you can't explain why a line is there and why it's correct, it shouldn't be in your PR.
+## Submitting a pull request
 
-**Specifically:**
+Use an Angular-style Conventional Commit title with an imperative summary. The scope is optional, as in `feat(repos): add branch browsing` or `fix: preserve file permissions`.
 
-- If you use AI to help write code, you must understand every line of the diff you're submitting.
-- Do not paste raw AI output into issues, PRs, or comments. If you use AI to help draft text, rewrite it in your own words.
-- Remove AI-generated footers, co-author attributions, and "Generated with..." signatures before submitting. Their presence tells us you didn't review your own submission carefully enough to notice them.
-- Automated submissions — bots or agents posting PRs without meaningful human review — will be treated as spam.
+Complete the [pull request template](.github/pull_request_template.md) and confirm your own review in the contributor checklist. Explain what changed, why it matters, and how you approached it. Include the checks you ran and disclose known failures, limitations, and any breaking changes. Short answers are welcome for small changes.
 
-## Consequences
-
-We'd rather help you improve a PR than close it. But we can't review work that wasn't reviewed by the person submitting it.
-
-- **First time:** You'll get a warning and a chance to fix the PR.
-- **Second time:** The PR will be closed.
-- **Repeated offenses:** May be reported to GitHub as spam.
+Draft pull requests are welcome for early feedback. For open, ready-for-review pull requests from human contributors, GitHub Actions posts a reminder when **What**, **Why**, or **How** is empty, or when the **Contributor checklist** is missing, empty, or has unchecked items. Editing the description refreshes the reminder and completing it removes the comment.

@@ -1,16 +1,31 @@
-## What this changes
+<!--
+Use an Angular-style Conventional Commit title such as feat(repos): add branch browsing or fix: preserve file permissions.
+Keep your answers proportionate to the change. Link related issues when applicable.
+-->
 
-<!-- What does this PR do and why? -->
+## What
 
-## How I tested this
+<!-- What does this PR change? -->
 
-<!-- How did you verify it works? -->
+## Why
 
-## Checklist
+<!-- What problem does this change solve? -->
 
-- [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md) and this PR follows the guidelines
-- [ ] A human has reviewed the **entire diff** of this PR, every line of code
-- [ ] A human understands the changes and can explain why this approach is correct
-- [ ] Tests pass
-- [ ] This PR doesn't have AI-generated boilerplate or co-author lines
-- [ ] This PR was authored and submitted by an AI agent without human review
+## How
+
+<!-- How does the change work? Mention significant decisions or trade-offs. -->
+
+## Validation
+
+<!-- List the relevant checks you ran and their results. Describe any failures or coverage gaps. -->
+
+## Impact
+
+<!-- Describe relevant behaviour, API, or operational changes and any migration steps. Remove this section if it does not apply. -->
+
+## Contributor checklist
+
+- [ ] I have personally reviewed the entire diff.
+- [ ] I understand the changes and can explain why they work.
+- [ ] I ran the relevant checks and disclosed any failures or limitations.
+- [ ] I followed the contribution guidelines.
